@@ -37,9 +37,9 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS website_url TEXT;
 
 CREATE TABLE IF NOT EXISTS calendar_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID,
   user_id UUID NOT NULL,
-  contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  contact_id UUID,
   title TEXT NOT NULL,
   description TEXT,
   event_type TEXT NOT NULL DEFAULT 'meeting' CHECK (event_type IN ('meeting', 'call', 'zoom', 'task', 'reminder', 'follow_up')),
@@ -67,35 +67,19 @@ ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view their calendar events" ON calendar_events;
 CREATE POLICY "Users can view their calendar events" ON calendar_events
-  FOR SELECT USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can insert calendar events" ON calendar_events;
 CREATE POLICY "Users can insert calendar events" ON calendar_events
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can update their calendar events" ON calendar_events;
 CREATE POLICY "Users can update their calendar events" ON calendar_events
-  FOR UPDATE USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR UPDATE USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can delete their calendar events" ON calendar_events;
 CREATE POLICY "Users can delete their calendar events" ON calendar_events
-  FOR DELETE USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- 3. RESEARCH TABLE
@@ -103,8 +87,8 @@ CREATE POLICY "Users can delete their calendar events" ON calendar_events
 
 CREATE TABLE IF NOT EXISTS contact_research (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  tenant_id UUID,
+  contact_id UUID NOT NULL,
   source TEXT NOT NULL,
   source_type TEXT NOT NULL DEFAULT 'manual' CHECK (source_type IN ('linkedin', 'press_release', 'email_verification', 'company_news', 'social_media', 'manual', 'api')),
   status TEXT NOT NULL DEFAULT 'verified' CHECK (status IN ('verified', 'pending', 'rejected', 'needs_review')),
@@ -124,24 +108,15 @@ ALTER TABLE contact_research ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view contact research" ON contact_research;
 CREATE POLICY "Users can view contact research" ON contact_research
-  FOR SELECT USING (
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can insert contact research" ON contact_research;
 CREATE POLICY "Users can insert contact research" ON contact_research
-  FOR INSERT WITH CHECK (
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can update contact research" ON contact_research;
 CREATE POLICY "Users can update contact research" ON contact_research
-  FOR UPDATE USING (
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR UPDATE USING (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- 4. OPPORTUNITIES TABLE
@@ -149,9 +124,9 @@ CREATE POLICY "Users can update contact research" ON contact_research
 
 CREATE TABLE IF NOT EXISTS opportunities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID,
   user_id UUID NOT NULL,
-  contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  contact_id UUID,
   title TEXT NOT NULL,
   description TEXT,
   value DECIMAL(12,2) DEFAULT 0,
@@ -160,7 +135,7 @@ CREATE TABLE IF NOT EXISTS opportunities (
   probability INTEGER DEFAULT 50,
   expected_close_date DATE,
   actual_close_date DATE,
-  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+  product_id UUID,
   notes TEXT,
   heat_status TEXT DEFAULT 'warm' CHECK (heat_status IN ('hot', 'warm', 'cold')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -177,62 +152,22 @@ ALTER TABLE opportunities ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view opportunities" ON opportunities;
 CREATE POLICY "Users can view opportunities" ON opportunities
-  FOR SELECT USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can insert opportunities" ON opportunities;
 CREATE POLICY "Users can insert opportunities" ON opportunities
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can update opportunities" ON opportunities;
 CREATE POLICY "Users can update opportunities" ON opportunities
-  FOR UPDATE USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR UPDATE USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can delete opportunities" ON opportunities;
 CREATE POLICY "Users can delete opportunities" ON opportunities
-  FOR DELETE USING (
-    user_id = auth.uid() OR
-    tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid()) OR
-    tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
-  );
+  FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- 5. USER SETTINGS - Add missing fields
 -- ============================================
 
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS response_time TEXT DEFAULT '5-10 Minutes';
-
--- ============================================
--- 6. INSERT SAMPLE DATA FOR PREVIEW
--- ============================================
-
--- Sample calendar events for preview
-INSERT INTO calendar_events (tenant_id, user_id, title, event_type, start_time, duration_minutes, status, heat_score)
-SELECT 
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  '00000000-0000-0000-0000-000000000000'::uuid,
-  title,
-  event_type,
-  start_time,
-  duration_minutes,
-  status,
-  heat_score
-FROM (VALUES
-  ('Acme Corp Discovery', 'zoom', NOW() + INTERVAL '2 hours', 30, 'scheduled', 92),
-  ('Global Tech Follow-up', 'call', NOW() + INTERVAL '5 hours', 45, 'scheduled', 75),
-  ('Strategic Planning: Q3', 'meeting', NOW() + INTERVAL '8 hours', 60, 'scheduled', 40),
-  ('Prospect Demo Call', 'zoom', NOW() + INTERVAL '1 day', 45, 'scheduled', 85),
-  ('Weekly Team Sync', 'meeting', NOW() + INTERVAL '2 days', 30, 'scheduled', 50)
-) AS t(title, event_type, start_time, duration_minutes, status, heat_score)
-ON CONFLICT DO NOTHING;

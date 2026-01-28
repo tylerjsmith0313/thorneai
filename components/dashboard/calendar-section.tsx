@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -13,39 +13,65 @@ import {
   Link as LinkIcon,
   Settings,
   Activity,
-  Sparkles
+  Sparkles,
+  Trash2
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BookingLinkModal } from "@/components/modals/booking-link-modal"
-import { ScheduleActivityModal, type ScheduledActivity } from "@/components/modals/calendar/schedule-activity-modal"
 import { NeuralDayAuditModal } from "@/components/modals/calendar/neural-day-audit-modal"
 import { ActivityTrackerModal } from "@/components/modals/contact-detail/activity-tracker-modal"
-
-interface AgendaItem {
-  id: string
-  title: string
-  time: string
-  duration: string
-  type: "zoom" | "call" | "meeting"
-  attendees: number
-  status: "completed" | "scheduled" | "cancelled"
-  heat: number
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { 
+  getCalendarEvents, 
+  createCalendarEvent, 
+  updateCalendarEvent, 
+  deleteCalendarEvent,
+  type CalendarEvent 
+} from "@/lib/data-service"
 
 export function CalendarSection() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [isActivityTrackerOpen, setIsActivityTrackerOpen] = useState(false)
   const [isDayAuditOpen, setIsDayAuditOpen] = useState(false)
-  const [editActivity, setEditActivity] = useState<ScheduledActivity | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(new Date().getDate())
+  
+  // Real data state
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  // Event modal state
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    eventType: "meeting" as CalendarEvent["eventType"],
+    startTime: "",
+    durationMinutes: 30,
+    location: "",
+    meetingUrl: "",
+    notes: "",
+  })
+  const [saving, setSaving] = useState(false)
 
-  const agendaItems: AgendaItem[] = [
-    { id: "1", title: "Acme Corp Discovery", time: "10:00 AM", duration: "30M", type: "zoom", attendees: 3, status: "completed", heat: 92 },
-    { id: "2", title: "Global Tech Follow-up", time: "01:30 PM", duration: "45M", type: "call", attendees: 2, status: "scheduled", heat: 75 },
-    { id: "3", title: "Strategic Planning: Q3", time: "04:00 PM", duration: "60M", type: "meeting", attendees: 5, status: "cancelled", heat: 40 },
-  ]
+  const loadEvents = useCallback(async () => {
+    setLoading(true)
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59)
+    const data = await getCalendarEvents(startOfMonth, endOfMonth)
+    setEvents(data)
+    setLoading(false)
+  }, [currentDate])
+
+  useEffect(() => {
+    loadEvents()
+  }, [loadEvents])
 
   const month = currentDate.toLocaleString("default", { month: "long" })
   const year = currentDate.getFullYear()
@@ -61,19 +87,30 @@ export function CalendarSection() {
     setCurrentDate(new Date(year, currentDate.getMonth() + 1, 1))
   }
 
+  const goToToday = () => {
+    const today = new Date()
+    setCurrentDate(today)
+    setSelectedDay(today.getDate())
+  }
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "zoom": return <Video size={14} />
       case "call": return <Phone size={14} />
+      case "follow_up": return <Clock size={14} />
+      case "task": return <Zap size={14} />
+      case "reminder": return <Clock size={14} />
       default: return <Users size={14} />
     }
   }
 
-  const getStatusBadge = (status: string, heat: number) => {
+  const getStatusBadge = (status: string, heatScore?: number) => {
+    const heat = heatScore || 50
     const colors = {
       completed: "bg-emerald-50 text-emerald-600 border-emerald-100",
       scheduled: "bg-amber-50 text-amber-600 border-amber-100",
       cancelled: "bg-rose-50 text-rose-500 border-rose-100",
+      rescheduled: "bg-blue-50 text-blue-600 border-blue-100",
     }
     return (
       <div className="flex flex-col items-end gap-1">
@@ -87,18 +124,107 @@ export function CalendarSection() {
     )
   }
 
-  const handleEditActivity = (item: AgendaItem) => {
-    setEditActivity({
-      id: item.id,
-      title: item.title,
-      date: new Date().toISOString().slice(0, 10),
-      time: item.time,
-      status: item.status,
-      classification: item.type === "zoom" ? "meeting" : item.type === "call" ? "call" : "meeting",
+  const getEventsForDay = (day: number) => {
+    return events.filter(event => {
+      const eventDate = new Date(event.startTime)
+      return eventDate.getDate() === day && 
+             eventDate.getMonth() === currentDate.getMonth() &&
+             eventDate.getFullYear() === currentDate.getFullYear()
+    })
+  }
+
+  const getDayEventsCount = (day: number) => {
+    return getEventsForDay(day).length
+  }
+
+  const handleOpenNewEvent = () => {
+    const selectedDate = new Date(year, currentDate.getMonth(), selectedDay)
+    setSelectedEvent(null)
+    setFormData({
+      title: "",
+      description: "",
+      eventType: "meeting",
+      startTime: `${selectedDate.toISOString().split("T")[0]}T09:00`,
+      durationMinutes: 30,
+      location: "",
+      meetingUrl: "",
       notes: "",
     })
-    setIsScheduleModalOpen(true)
+    setShowEventModal(true)
   }
+
+  const handleEditEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event)
+    const startDate = new Date(event.startTime)
+    setFormData({
+      title: event.title,
+      description: event.description || "",
+      eventType: event.eventType,
+      startTime: startDate.toISOString().slice(0, 16),
+      durationMinutes: event.durationMinutes,
+      location: event.location || "",
+      meetingUrl: event.meetingUrl || "",
+      notes: event.notes || "",
+    })
+    setShowEventModal(true)
+  }
+
+  const handleSaveEvent = async () => {
+    if (!formData.title || !formData.startTime) return
+
+    setSaving(true)
+    try {
+      if (selectedEvent) {
+        await updateCalendarEvent(selectedEvent.id, {
+          title: formData.title,
+          description: formData.description,
+          eventType: formData.eventType,
+          startTime: new Date(formData.startTime).toISOString(),
+          durationMinutes: formData.durationMinutes,
+          location: formData.location,
+          meetingUrl: formData.meetingUrl,
+          notes: formData.notes,
+        })
+      } else {
+        await createCalendarEvent({
+          userId: "",
+          title: formData.title,
+          description: formData.description,
+          eventType: formData.eventType,
+          startTime: new Date(formData.startTime).toISOString(),
+          durationMinutes: formData.durationMinutes,
+          location: formData.location,
+          meetingUrl: formData.meetingUrl,
+          notes: formData.notes,
+          status: "scheduled",
+        })
+      }
+
+      setShowEventModal(false)
+      loadEvents()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return
+    setSaving(true)
+    try {
+      await deleteCalendarEvent(selectedEvent.id)
+      setShowEventModal(false)
+      loadEvents()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleMarkComplete = async (event: CalendarEvent) => {
+    await updateCalendarEvent(event.id, { status: "completed" })
+    loadEvents()
+  }
+
+  const selectedDayEvents = getEventsForDay(selectedDay)
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500">
@@ -110,7 +236,9 @@ export function CalendarSection() {
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Neural Availability Hub</span>
           </div>
           <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Global Schedule</h3>
-          <p className="text-xs text-slate-500 mt-1 italic">"Thorne is orchestrating 3 high-heat connections this month."</p>
+          <p className="text-xs text-slate-500 mt-1 italic">
+            {loading ? "Loading events..." : `${events.length} events this month`}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <BaseButton 
@@ -136,7 +264,7 @@ export function CalendarSection() {
             size="sm" 
             className="rounded-xl font-bold text-[10px] uppercase tracking-wider"
             icon={<Plus size={14} />}
-            onClick={() => { setEditActivity(null); setIsScheduleModalOpen(true) }}
+            onClick={handleOpenNewEvent}
           >
             Schedule Activity
           </BaseButton>
@@ -151,7 +279,10 @@ export function CalendarSection() {
               <h4 className="text-xl font-black text-slate-800 tracking-tight">
                 {month} {year}
               </h4>
-              <button className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all">
+              <button 
+                onClick={goToToday}
+                className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all"
+              >
                 Today
               </button>
             </div>
@@ -174,17 +305,18 @@ export function CalendarSection() {
 
           {/* Calendar Days */}
           <div className="grid grid-cols-7 gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden flex-1">
-            {/* Empty cells for days before the first of the month */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
               <div key={`empty-${i}`} className="bg-slate-50/50 min-h-[80px] p-2" />
             ))}
             
-            {/* Actual days */}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1
-              const isToday = day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth()
+              const isToday = day === new Date().getDate() && 
+                              currentDate.getMonth() === new Date().getMonth() &&
+                              currentDate.getFullYear() === new Date().getFullYear()
               const isSelected = day === selectedDay
-              const hasEvents = day === 28 // Mock: day 28 has events
+              const eventCount = getDayEventsCount(day)
+              const dayEvents = getEventsForDay(day)
               
               return (
                 <button
@@ -200,11 +332,24 @@ export function CalendarSection() {
                     {day}
                   </span>
                   
-                  {hasEvents && (
-                    <div className="flex items-center justify-center gap-0.5 mt-1">
-                      <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                  {eventCount > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {dayEvents.slice(0, 2).map(event => (
+                        <div 
+                          key={event.id}
+                          className={`text-[9px] px-1 py-0.5 rounded truncate ${
+                            event.eventType === "zoom" ? "bg-blue-50 text-blue-600" :
+                            event.eventType === "call" ? "bg-green-50 text-green-600" :
+                            event.eventType === "meeting" ? "bg-indigo-50 text-indigo-600" :
+                            "bg-amber-50 text-amber-600"
+                          }`}
+                        >
+                          {event.title}
+                        </div>
+                      ))}
+                      {eventCount > 2 && (
+                        <div className="text-[9px] text-slate-400 px-1">+{eventCount - 2} more</div>
+                      )}
                     </div>
                   )}
                 </button>
@@ -215,18 +360,22 @@ export function CalendarSection() {
 
         {/* Sidebar: Agenda */}
         <div className="lg:col-span-4 flex flex-col gap-4 min-h-0">
-          {/* Day Agenda Card */}
           <div className="bg-white border border-slate-200 rounded-[32px] p-6 shadow-sm flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100">
                   <Sparkles size={16} />
                 </div>
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Agenda: Day {selectedDay}</h4>
+                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                  Agenda: {month} {selectedDay}
+                </h4>
               </div>
               <div className="flex items-center gap-1">
-                <button className="p-1.5 text-slate-300 hover:text-indigo-600 transition-colors">
-                  <Zap size={14} />
+                <button 
+                  onClick={handleOpenNewEvent}
+                  className="p-1.5 text-slate-300 hover:text-indigo-600 transition-colors"
+                >
+                  <Plus size={14} />
                 </button>
                 <button className="p-1.5 text-slate-300 hover:text-indigo-600 transition-colors">
                   <Settings size={14} />
@@ -236,36 +385,69 @@ export function CalendarSection() {
 
             {/* Agenda Items */}
             <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar min-h-0">
-              {agendaItems.map((item) => (
-                <div 
-                  key={item.id} 
-                  className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer"
-                  onClick={() => handleEditActivity(item)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">{item.time}</span>
-                    {getStatusBadge(item.status, item.heat)}
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl shrink-0 ${
-                      item.status === "completed" ? "bg-emerald-50 text-emerald-500 border border-emerald-100" :
-                      item.status === "cancelled" ? "bg-slate-100 text-slate-400 border border-slate-200" :
-                      "bg-white text-slate-500 border border-slate-100 shadow-sm"
-                    }`}>
-                      {getTypeIcon(item.type)}
+              {loading ? (
+                <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+              ) : selectedDayEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-slate-400 text-sm mb-3">No events scheduled</div>
+                  <BaseButton 
+                    variant="outline" 
+                    size="sm" 
+                    className="rounded-xl text-[10px] font-bold uppercase"
+                    icon={<Plus size={14} />}
+                    onClick={handleOpenNewEvent}
+                  >
+                    Add Event
+                  </BaseButton>
+                </div>
+              ) : (
+                selectedDayEvents.map((event) => (
+                  <div 
+                    key={event.id} 
+                    className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer"
+                    onClick={() => handleEditEvent(event)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">
+                        {new Date(event.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {getStatusBadge(event.status, event.heatScore)}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h5 className="text-sm font-bold text-slate-800 truncate">{item.title}</h5>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Clock size={10} className="text-slate-300" />
-                        <span className="text-[10px] text-slate-400">{item.duration}</span>
-                        <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                        <span className="text-[10px] text-slate-400">{item.attendees} Att.</span>
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-xl shrink-0 ${
+                        event.status === "completed" ? "bg-emerald-50 text-emerald-500 border border-emerald-100" :
+                        event.status === "cancelled" ? "bg-slate-100 text-slate-400 border border-slate-200" :
+                        "bg-white text-slate-500 border border-slate-100 shadow-sm"
+                      }`}>
+                        {getTypeIcon(event.eventType)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h5 className="text-sm font-bold text-slate-800 truncate">{event.title}</h5>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Clock size={10} className="text-slate-300" />
+                          <span className="text-[10px] text-slate-400">{event.durationMinutes}m</span>
+                          {event.location && (
+                            <>
+                              <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                              <span className="text-[10px] text-slate-400 truncate">{event.location}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    {event.status === "scheduled" && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMarkComplete(event); }}
+                          className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
+                        >
+                          Mark Complete
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             {/* Actions */}
@@ -280,31 +462,134 @@ export function CalendarSection() {
               >
                 View Detailed Day Audit
               </BaseButton>
-              <BaseButton 
-                variant="outline" 
-                fullWidth 
-                size="sm" 
-                className="rounded-xl text-[10px] font-bold uppercase tracking-wider bg-transparent border-slate-200"
-                icon={<Settings size={14} />}
-              >
-                Agenda Settings
-              </BaseButton>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Event Modal */}
+      <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{selectedEvent ? "Edit Event" : "New Event"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Event title"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="eventType">Type</Label>
+                <Select value={formData.eventType} onValueChange={(v: any) => setFormData({ ...formData, eventType: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="call">Call</SelectItem>
+                    <SelectItem value="zoom">Zoom</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="reminder">Reminder</SelectItem>
+                    <SelectItem value="follow_up">Follow Up</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration</Label>
+                <Select value={String(formData.durationMinutes)} onValueChange={(v) => setFormData({ ...formData, durationMinutes: parseInt(v) })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="90">1.5 hours</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="startTime">Date & Time</Label>
+              <Input
+                id="startTime"
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="Office, Conference Room, etc."
+              />
+            </div>
+
+            {(formData.eventType === "zoom" || formData.eventType === "call") && (
+              <div className="space-y-2">
+                <Label htmlFor="meetingUrl">Meeting URL</Label>
+                <Input
+                  id="meetingUrl"
+                  value={formData.meetingUrl}
+                  onChange={(e) => setFormData({ ...formData, meetingUrl: e.target.value })}
+                  placeholder="https://zoom.us/..."
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            {selectedEvent && (
+              <Button 
+                variant="outline" 
+                onClick={handleDeleteEvent} 
+                disabled={saving}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
+              >
+                <Trash2 size={16} className="mr-2" />
+                Delete
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setShowEventModal(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEvent} disabled={saving}>
+                {saving ? "Saving..." : selectedEvent ? "Update" : "Create"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Other Modals */}
       {isBookingModalOpen && <BookingLinkModal onClose={() => setIsBookingModalOpen(false)} />}
-      {isScheduleModalOpen && (
-        <ScheduleActivityModal 
-          onClose={() => { setIsScheduleModalOpen(false); setEditActivity(null) }}
-          editActivity={editActivity}
-          onSave={(activity) => {
-            console.log("Saved activity:", activity)
-          }}
-        />
-      )}
       {isActivityTrackerOpen && (
         <ActivityTrackerModal 
           onClose={() => setIsActivityTrackerOpen(false)}
