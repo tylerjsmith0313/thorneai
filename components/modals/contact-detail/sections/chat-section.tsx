@@ -1,359 +1,247 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
 import { 
-  Send, Zap, User, Sparkles, Settings, 
-  Paperclip, FileText, Phone, Calendar, Gift,
-  Loader2, Activity, Maximize2
+  Send, Sparkles, Bot, User as UserIcon, 
+  Loader2, ExternalLink, Zap
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { communicationManager } from "@/lib/services/communication-manager"
 import type { Contact } from "@/types"
+import { ConversationEngineModal } from "./conversation-engine-modal"
 
 interface ChatSectionProps {
   contact: Contact
 }
 
-interface Message {
-  id: string
-  type: "ai" | "user" | "system" | "transcription"
-  content: string
-  timestamp: string
-}
-
 export function ChatSection({ contact }: ChatSectionProps) {
-  const [mode, setMode] = useState<"user" | "flow">("flow")
-  const [message, setMessage] = useState("")
-  const [isSending, setIsSending] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [aiInsight, setAiInsight] = useState<string | null>(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  
-  const supabase = createClient()
+  const [inputValue, setInputValue] = useState("")
+  const [showConversationEngine, setShowConversationEngine] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Load email conversations for this contact only
+  // Create contact context for the AI
+  const contactContext = {
+    id: contact.id,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    company: contact.company,
+    industry: contact.industry,
+    interests: contact.interests,
+    demeanor: contact.demeanor,
+    engagementScore: contact.engagementScore,
+  }
+
+  const { messages, sendMessage, status } = useChat({
+    id: `contact-chat-${contact.id}`,
+    transport: new DefaultChatTransport({ 
+      api: "/api/ai/chat",
+      prepareSendMessagesRequest: ({ id, messages }) => ({
+        body: {
+          messages,
+          contactContext,
+        },
+      }),
+    }),
+    initialMessages: [
+      {
+        id: "welcome",
+        role: "assistant",
+        parts: [{ 
+          type: "text", 
+          text: `Hello! I'm AgyntSynq, your AI assistant. I have access to ${contact.firstName} ${contact.lastName}'s profile and can help you with insights, communication strategies, and recommendations for this contact. What would you like to know?` 
+        }],
+      },
+    ],
+  })
+
+  // Scroll to bottom on new messages
   useEffect(() => {
-    async function loadEmailConversations() {
-      setIsLoading(true)
-      
-      // Get email conversations from contact_communications table
-      const { data: communications } = await supabase
-        .from("contact_communications")
-        .select("*")
-        .eq("contact_id", contact.id)
-        .eq("channel", "email")
-        .order("created_at", { ascending: true })
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
-      if (communications && communications.length > 0) {
-        const loadedMessages: Message[] = communications.map(comm => ({
-          id: comm.id,
-          type: comm.direction === "inbound" ? "user" : "ai",
-          content: comm.content,
-          timestamp: formatTimestamp(comm.created_at)
-        }))
-        setMessages(loadedMessages)
-      } else {
-        // Default welcome message
-        setMessages([{
-          id: "system-1",
-          type: "system",
-          content: `Connection established with ${contact.firstName} ${contact.lastName}. I am monitoring this node for engagement signals.`,
-          timestamp: "Just now"
-        }])
-      }
+  const handleSend = useCallback(() => {
+    if (!inputValue.trim() || status === "streaming") return
+    sendMessage({ text: inputValue })
+    setInputValue("")
+  }, [inputValue, sendMessage, status])
 
-      // Generate AI insight based on contact data
-      generateAiInsight()
-      setIsLoading(false)
-    }
+  const handleQuickPrompt = useCallback((prompt: string) => {
+    sendMessage({ text: prompt })
+  }, [sendMessage])
 
-    loadEmailConversations()
-  }, [contact.id, contact.firstName, contact.lastName])
-
-  function formatTimestamp(dateString: string): string {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
-    return `${Math.floor(diffMins / 1440)}d ago`
+  const getMessageText = (msg: typeof messages[0]) => {
+    if (!msg.parts || !Array.isArray(msg.parts)) return ""
+    return msg.parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("")
   }
 
-  function generateAiInsight() {
-    const insights = [
-      `"Thorne is currently drafting a reply that leverages the 'Q2 Onboarding' node. Recommended: Schedule call for tomorrow 2PM."`,
-      `"Based on ${contact.firstName}'s engagement pattern, optimal outreach window is Tuesday-Thursday, 10AM-2PM."`,
-      `"${contact.company} recently announced expansion. Consider positioning value prop around scalability."`,
-    ]
-    setAiInsight(insights[Math.floor(Math.random() * insights.length)])
+  const getToolCalls = (msg: typeof messages[0]) => {
+    if (!msg.parts || !Array.isArray(msg.parts)) return []
+    return msg.parts.filter((p): p is { type: "tool-invocation"; toolInvocation: any } => 
+      p.type === "tool-invocation"
+    )
   }
 
-  const handleSend = async () => {
-    if (!message.trim() || isSending) return
-    setIsSending(true)
-
-    try {
-      await communicationManager.sendMessage(contact.id, "email", message)
-      setMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
-        type: "ai",
-        content: message,
-        timestamp: "Just now"
-      }])
-      setMessage("")
-    } catch (error) {
-      console.error("Failed to send message:", error)
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const handleThorneDraft = async () => {
-    setIsSending(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    const drafts = [
-      `Hi ${contact.firstName}, I've been following ${contact.company}'s recent progress and I'm impressed by your growth trajectory. I wanted to share some insights that might be valuable...`,
-      `Hi ${contact.firstName}, since you've expressed interest in our platform recently, I wanted to reach out with a brief analysis on industry trends that I think you'll find interesting.`,
-      `Hi ${contact.firstName}, I noticed you were looking into our solutions and wanted to share some relevant case studies from similar companies in the ${contact.industry || "tech"} space.`
-    ]
-    
-    setMessage(drafts[Math.floor(Math.random() * drafts.length)])
-    setIsSending(false)
-  }
-
-  const handleTacticalAction = async (action: string) => {
-    setIsSending(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    let actionMessage = ""
-    switch (action) {
-      case "case-study":
-        actionMessage = `Hi ${contact.firstName}, I thought you might find this case study relevant to ${contact.company}'s current initiatives. It covers how similar organizations achieved 40% efficiency gains...`
-        break
-      case "discovery":
-        actionMessage = `Hi ${contact.firstName}, I'd love to schedule a quick discovery call to better understand ${contact.company}'s goals. Would you be available for a 30-minute chat this week?`
-        break
-      case "gift":
-        actionMessage = `Hi ${contact.firstName}, I wanted to send you a small token of appreciation for your time. Please check your email for a gift card...`
-        break
-    }
-    
-    setMessage(actionMessage)
-    setIsSending(false)
+  const formatToolName = (name: string): string => {
+    return name
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim()
   }
 
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-300">
-      {/* Left Panel - Chat */}
-      <div className="flex-1 flex flex-col bg-white rounded-[32px] border border-slate-200 overflow-hidden">
+    <>
+      <div className="flex flex-col h-[500px] bg-white rounded-[32px] border border-slate-200 overflow-hidden animate-in fade-in duration-300">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <Sparkles className="text-indigo-600" size={20} />
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Sparkles className="text-white" size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-black text-slate-900 tracking-tight">THORNE CONVERSATION ENGINE</h2>
-              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                Active Intelligence: {contact.firstName} {contact.lastName}
+              <h2 className="text-sm font-black text-slate-900 tracking-tight">AGYNTSYNQ ASSISTANT</h2>
+              <p className="text-[10px] text-slate-500">
+                Context: <span className="font-semibold text-indigo-600">{contact.firstName} {contact.lastName}</span>
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* Mode Toggle */}
-            <div className="flex items-center bg-slate-100 rounded-full p-0.5">
-              <button
-                onClick={() => setMode("user")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all ${
-                  mode === "user" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                }`}
-              >
-                <User size={12} />
-                User
-              </button>
-              <button
-                onClick={() => setMode("flow")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all ${
-                  mode === "flow" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500"
-                }`}
-              >
-                <Zap size={12} />
-                Flow
-              </button>
-            </div>
-            
-            <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-              <Settings size={16} />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowConversationEngine(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+          >
+            <ExternalLink size={14} />
+            Open Conversation Engine
+          </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[250px]">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="animate-spin text-indigo-500" size={24} />
-            </div>
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.type === "user" || msg.type === "transcription" ? "justify-end" : "justify-start"}`}>
-                {msg.type === "system" ? (
-                  <div className="flex items-start gap-2 max-w-sm">
-                    <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                      <Activity className="text-emerald-600" size={12} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600">{msg.content}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">System</p>
-                    </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+          {messages.map((msg) => {
+            const text = getMessageText(msg)
+            const toolCalls = getToolCalls(msg)
+            
+            return (
+              <div 
+                key={msg.id} 
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div className={`flex items-start gap-2 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    msg.role === "user" 
+                      ? "bg-slate-200" 
+                      : "bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg"
+                  }`}>
+                    {msg.role === "user" 
+                      ? <UserIcon size={14} className="text-slate-600" />
+                      : <Sparkles size={14} className="text-white" />
+                    }
                   </div>
-                ) : msg.type === "transcription" ? (
-                  <div className="max-w-xs">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 justify-end">
-                      <Phone size={10} />
-                      Phone Transcription
-                    </p>
-                    <div className="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-3 py-2 text-xs">
-                      {msg.content}
-                    </div>
-                    <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
-                  </div>
-                ) : msg.type === "ai" ? (
-                  <div className="flex items-start gap-2 max-w-sm">
-                    <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                      <Activity className="text-indigo-600" size={12} />
-                    </div>
-                    <div>
-                      <div className="bg-slate-100 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-slate-700">
-                        {msg.content}
+                  <div>
+                    {/* Tool calls indicator */}
+                    {toolCalls.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {toolCalls.map((tc, i) => (
+                          <div 
+                            key={i}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs"
+                          >
+                            <Zap size={10} />
+                            {formatToolName(tc.toolInvocation?.toolName || "tool")}
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-[9px] text-rose-500 font-bold mt-1">{msg.timestamp}</p>
-                    </div>
+                    )}
+                    
+                    {text && (
+                      <div className={`rounded-2xl px-4 py-3 ${
+                        msg.role === "user"
+                          ? "bg-indigo-600 text-white rounded-br-sm"
+                          : "bg-white border border-slate-200 text-slate-700 rounded-bl-sm shadow-sm"
+                      }`}>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{text}</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="max-w-xs">
-                    <div className="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-3 py-2 text-xs">
-                      {msg.content}
-                    </div>
-                    <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
-                  </div>
-                )}
+                </div>
               </div>
-            ))
+            )
+          })}
+          
+          {status === "streaming" && (
+            <div className="flex justify-start">
+              <div className="flex items-start gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Sparkles size={14} className="text-white animate-pulse" />
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin text-indigo-500" />
+                    <span className="text-sm text-slate-500">AgyntSynq is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
+          
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 rounded-xl p-3">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={`Reply to ${contact.firstName}...`}
-              className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
-              disabled={isSending}
+        <div className="p-4 border-t border-slate-100 bg-white">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              placeholder={`Ask about ${contact.firstName}...`}
+              className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all"
+              disabled={status === "streaming"}
             />
-            <div className="flex items-center justify-between mt-2">
-              <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-                <Paperclip size={14} />
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() || status === "streaming"}
+              className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {status === "streaming" ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Send size={18} />
+              )}
+            </button>
+          </div>
+          
+          {/* Quick prompts */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {[
+              { label: "Best approach?", prompt: `What's the best approach to engage with ${contact.firstName} based on their profile and current status?` },
+              { label: "Draft an email", prompt: `Help me draft a personalized email for ${contact.firstName} at ${contact.company}.` },
+              { label: "Profile insights", prompt: `Give me key insights about ${contact.firstName} ${contact.lastName} that would help me build rapport.` },
+              { label: "Schedule a call", prompt: `Help me schedule a discovery call with ${contact.firstName}. What should I include in the invite?` },
+            ].map(({ label, prompt }) => (
+              <button
+                key={label}
+                onClick={() => handleQuickPrompt(prompt)}
+                className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                disabled={status === "streaming"}
+              >
+                {label}
               </button>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleThorneDraft}
-                  disabled={isSending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-bold uppercase tracking-wider text-slate-600 hover:border-indigo-300 transition-all disabled:opacity-50"
-                >
-                  <Zap size={12} className="text-indigo-500" />
-                  Thorne Draft
-                </button>
-                <button
-                  onClick={handleSend}
-                  disabled={!message.trim() || isSending}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                  Send
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Right Panel - Intel & Context */}
-      <div className="w-64 flex flex-col gap-4">
-        {/* Thorne Real-Time Intel */}
-        <div className="bg-white rounded-[24px] border border-slate-200 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="text-indigo-500" size={14} />
-            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Thorne Real-Time Intel</h3>
-          </div>
-          
-          <div className="bg-slate-800 rounded-xl p-3">
-            <p className="text-[10px] text-slate-300 italic leading-relaxed">
-              {aiInsight}
-            </p>
-          </div>
-        </div>
-
-        {/* Contact Profile Context */}
-        <div className="bg-white rounded-[24px] border border-slate-200 p-4">
-          <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Contact Profile Context</h3>
-          
-          <div className="space-y-2">
-            <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Industry</span>
-              <span className="text-[10px] font-medium text-slate-900">{contact.industry || "SaaS Architecture"}</span>
-            </div>
-            <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Interests</span>
-              <span className="text-[10px] font-medium text-slate-900 text-right">{contact.interests?.join(", ") || "Golf, Tech Investing"}</span>
-            </div>
-            <div className="flex items-center justify-between py-1.5">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Demeanor</span>
-              <span className="text-[10px] font-medium text-slate-900">{contact.demeanor || "Analytical"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tactical Actions */}
-        <div className="bg-white rounded-[24px] border border-slate-200 p-4">
-          <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Tactical Actions</h3>
-          
-          <div className="space-y-2">
-            <button
-              onClick={() => handleTacticalAction("case-study")}
-              disabled={isSending}
-              className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
-            >
-              <FileText size={14} className="text-slate-400" />
-              Send Case Study
-            </button>
-            <button
-              onClick={() => handleTacticalAction("discovery")}
-              disabled={isSending}
-              className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
-            >
-              <Calendar size={14} className="text-slate-400" />
-              Propose Discovery Call
-            </button>
-            <button
-              onClick={() => handleTacticalAction("gift")}
-              disabled={isSending}
-              className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
-            >
-              <Gift size={14} className="text-slate-400" />
-              Send Custom Gift
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Conversation Engine Modal */}
+      {showConversationEngine && (
+        <ConversationEngineModal 
+          contact={contact} 
+          onClose={() => setShowConversationEngine(false)} 
+        />
+      )}
+    </>
   )
 }

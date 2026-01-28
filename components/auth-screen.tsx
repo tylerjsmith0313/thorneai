@@ -14,7 +14,7 @@ export function AuthScreen({ onAuthenticate }: AuthScreenProps) {
         <div className="w-24 h-24 rounded-full bg-thorne-lavender/40 flex items-center justify-center mb-6">
           <Shield className="w-12 h-12 text-thorne-indigo" />
         </div>
-        <h1 className="text-4xl font-bold tracking-tight text-thorne-navy">THORNE</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-thorne-navy">AGYNTSYNQ</h1>
         <p className="text-thorne-indigo tracking-[0.3em] text-sm font-medium mt-1">NEURAL CORE</p>
       </div>
 
@@ -57,7 +57,7 @@ export function AuthScreen({ onAuthenticate }: AuthScreenProps) {
 
       {/* Footer */}
       <p className="mt-12 text-xs text-muted-foreground tracking-wider">
-        SECURED BY THORNE CRYPTOGRAPHIC LAYER &bull; V3.2.0
+        SECURED BY AGYNTSYNQ CRYPTOGRAPHIC LAYER &bull; V3.2.0
       </p>
     </div>
   )

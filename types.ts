@@ -15,14 +15,34 @@ export interface Contact {
   company: string
   jobTitle?: string
   phone?: string
+  industry?: string
   // Address fields (optional - required for physical outreach channels)
   streetAddress?: string
+  address?: string
   city?: string
   state?: string
   zipCode?: string
   country?: string
   // Company address (optional)
   companyAddress?: string
+  // Social media
+  linkedinUrl?: string
+  twitterHandle?: string
+  instagramHandle?: string
+  facebookUrl?: string
+  youtubeUrl?: string
+  tiktokHandle?: string
+  websiteUrl?: string
+  // Profile/summary fields
+  interests?: string[]
+  hobbies?: string[]
+  notes?: string
+  demeanor?: string
+  communicationPace?: string
+  preferredChannel?: string
+  outreachBudget?: number
+  outreachChannels?: string[]
+  // Status fields
   status: ContactStatus
   source?: string
   engagementScore?: number
@@ -115,15 +135,28 @@ export interface User {
 export interface UserSettings {
   id: string
   userId: string
-  autoAddResearch: boolean
-  firstEngage: boolean
-  nextStepNotifications: boolean
-  responseCadence: string
-  outreachPersonality: 'Casual' | 'Professional' | 'Fun' | 'Enthusiastic' | 'Consultative' | 'Mimic Voice'
-  scrubDnc: boolean
-  automationMode: 'user_controlled' | 'full_auto'
-  maxGiftValue: number
-  monthlyBurnLimit: number
+  // AI Configuration
+  aiName?: string
+  aiDescription?: string
+  aiInstructions?: string
+  businessDescription?: string
+  aiGoals?: string
+  businessGoals?: string
+  personalGoals?: string
+  // Automation settings
+  autoAddResearch?: boolean
+  firstEngage?: boolean
+  nextStepNotifications?: boolean
+  responseCadence?: string
+  responseTime?: string
+  outreachPersonality?: 'Casual' | 'Professional' | 'Fun' | 'Enthusiastic' | 'Consultative' | 'Mimic Voice'
+  scrubDnc?: boolean
+  automationMode?: 'user_controlled' | 'full_auto'
+  autoSend?: boolean
+  maxGiftValue?: number
+  monthlyBurnLimit?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 // UI-specific types

@@ -11,7 +11,7 @@ export function NeuralFeed() {
             <Grid3X3 className="w-5 h-5 text-thorne-indigo" />
           </div>
           <div>
-            <h2 className="font-semibold text-foreground">NEURAL FEED</h2>
+            <h2 className="font-semibold text-foreground">AGYNT FEED</h2>
             <p className="text-xs text-muted-foreground">LIVE BUSINESS DIAGNOSTICS AND CONVERSION TELEMETRY.</p>
           </div>
         </div>

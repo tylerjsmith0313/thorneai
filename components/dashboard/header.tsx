@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
-import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut } from "lucide-react"
+import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut, Brain, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
@@ -14,6 +14,8 @@ interface DashboardHeaderProps {
   onBulkClick?: () => void
   onFinderClick?: () => void
   onAddContactClick?: () => void
+  onNeuralLinkClick?: () => void
+  onAnalyticsClick?: () => void
 }
 
 export function DashboardHeader({ 
@@ -23,7 +25,9 @@ export function DashboardHeader({
   onScannerClick,
   onBulkClick,
   onFinderClick,
-  onAddContactClick
+  onAddContactClick,
+  onNeuralLinkClick,
+  onAnalyticsClick
 }: DashboardHeaderProps) {
   const router = useRouter()
 
@@ -42,7 +46,7 @@ export function DashboardHeader({
             <Shield className="w-5 h-5" />
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-base font-black text-slate-900 leading-none uppercase tracking-tight">Thorne</h1>
+            <h1 className="text-base font-black text-slate-900 leading-none uppercase tracking-tight">AgyntSynq</h1>
             <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.3em] mt-1.5">Neural Core</p>
           </div>
         </div>
@@ -74,6 +78,18 @@ export function DashboardHeader({
               label="Finder" 
               onClick={onFinderClick} 
               color="text-blue-500"
+            />
+            <ToolIconButton 
+              icon={<Brain className="w-4 h-4" />} 
+              label="Neural Link" 
+              onClick={onNeuralLinkClick} 
+              color="text-purple-500"
+            />
+            <ToolIconButton 
+              icon={<BarChart3 className="w-4 h-4" />} 
+              label="Analytics" 
+              onClick={onAnalyticsClick} 
+              color="text-amber-500"
             />
             
             <div className="w-px h-5 bg-slate-300 mx-2.5 self-center opacity-30" />

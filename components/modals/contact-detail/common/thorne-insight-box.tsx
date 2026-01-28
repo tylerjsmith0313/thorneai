@@ -3,19 +3,19 @@
 import { Zap } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 
-interface ThorneInsightBoxProps {
+interface AgyntInsightBoxProps {
   insight: string
   showAction?: boolean
 }
 
-export function ThorneInsightBox({ insight, showAction = false }: ThorneInsightBoxProps) {
+export function ThorneInsightBox({ insight, showAction = false }: AgyntInsightBoxProps) {
   return (
     <div className="bg-indigo-900 rounded-[32px] p-8 text-white space-y-4 relative overflow-hidden shadow-2xl shadow-indigo-100">
       <div className="flex items-center gap-3">
         <div className="p-2 bg-indigo-500/50 rounded-xl">
           <Zap size={16} className="text-indigo-200" />
         </div>
-        <h4 className="text-sm font-bold tracking-tight">Thorne AI Intelligence</h4>
+        <h4 className="text-sm font-bold tracking-tight">AgyntSynq AI Intelligence</h4>
       </div>
       <p className="text-sm text-indigo-100 leading-relaxed font-medium">
         {insight}
@@ -27,7 +27,7 @@ export function ThorneInsightBox({ insight, showAction = false }: ThorneInsightB
             size="sm" 
             className="bg-white text-indigo-600 hover:bg-indigo-50 border-none shadow-none"
           >
-            Launch Thorne Research
+            Launch AgyntSynq Research
           </BaseButton>
         </div>
       )}
