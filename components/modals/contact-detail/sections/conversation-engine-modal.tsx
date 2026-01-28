@@ -78,7 +78,8 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
     }
 
     loadEmailConversations()
-  }, [contact.id, contact.firstName, contact.lastName])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact.id])
 
   function formatTimestamp(dateString: string): string {
     const date = new Date(dateString)

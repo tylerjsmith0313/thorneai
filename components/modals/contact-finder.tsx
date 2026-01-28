@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Search, Linkedin, Facebook, Globe, Instagram, CheckCircle, UserPlus, Filter, Sparkles, AlertCircle, Loader2, Mail, Phone } from "lucide-react"
+import { useTransition } from "react"
+
+import { useState } from "react"
+import { Search, Linkedin, Facebook, Globe, Instagram, CheckCircle, UserPlus, Filter, Sparkles, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { searchLeads, verifyLead, saveLeadAsContact, type EnrichedLead } from "@/lib/services/lead-enrichment"
 import { toast } from "sonner"
@@ -31,7 +33,6 @@ export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
   const [isSearching, setIsSearching] = useState(false)
   const [results, setResults] = useState<FoundLead[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(["LINKEDIN", "GOOGLE"])
-  const [isPending, startTransition] = useTransition()
   const [savingId, setSavingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
