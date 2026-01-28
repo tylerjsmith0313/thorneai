@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
-import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut } from "lucide-react"
+import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut, Brain } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
@@ -14,6 +14,7 @@ interface DashboardHeaderProps {
   onBulkClick?: () => void
   onFinderClick?: () => void
   onAddContactClick?: () => void
+  onNeuralLinkClick?: () => void
 }
 
 export function DashboardHeader({ 
@@ -23,7 +24,8 @@ export function DashboardHeader({
   onScannerClick,
   onBulkClick,
   onFinderClick,
-  onAddContactClick
+  onAddContactClick,
+  onNeuralLinkClick
 }: DashboardHeaderProps) {
   const router = useRouter()
 
@@ -74,6 +76,12 @@ export function DashboardHeader({
               label="Finder" 
               onClick={onFinderClick} 
               color="text-blue-500"
+            />
+            <ToolIconButton 
+              icon={<Brain className="w-4 h-4" />} 
+              label="Neural Link" 
+              onClick={onNeuralLinkClick} 
+              color="text-purple-500"
             />
             
             <div className="w-px h-5 bg-slate-300 mx-2.5 self-center opacity-30" />

@@ -35,6 +35,7 @@ import { ContactFinder } from "./modals/contact-finder"
 import { BulkUpload } from "./modals/bulk-upload"
 import { AddContactWizard } from "./modals/add-contact-wizard"
 import { AdminCenter } from "./modals/admin-center/admin-center"
+import { NeuralLink } from "./neural-link/neural-link"
 
 // Types
 import type { Contact, Deal, Conversation } from "@/types"
@@ -63,6 +64,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
   const [showFinder, setShowFinder] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
+  const [showNeuralLink, setShowNeuralLink] = useState(false)
 
   const handleVerifyLead = (lead: unknown) => {
     console.log("[v0] Lead verified:", lead)
@@ -91,6 +93,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
         onBulkClick={() => setShowBulkUpload(true)}
         onFinderClick={() => setShowFinder(true)}
         onAddContactClick={() => setShowAddContact(true)}
+        onNeuralLinkClick={() => setShowNeuralLink(true)}
       />
 
       {/* Main Content */}
@@ -133,6 +136,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
       {showFinder && <ContactFinder onClose={() => setShowFinder(false)} onVerify={handleVerifyLead} />}
       {showBulkUpload && <BulkUpload onClose={() => setShowBulkUpload(false)} onIngest={handleBulkIngest} />}
       {showAddContact && <AddContactWizard onClose={() => setShowAddContact(false)} onSuccess={handleContactAdded} />}
+      {showNeuralLink && <NeuralLink onClose={() => setShowNeuralLink(false)} />}
     </div>
   )
 }
