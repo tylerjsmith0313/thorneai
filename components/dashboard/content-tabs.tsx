@@ -3,6 +3,9 @@
 import { useState } from "react"
 import { AICommandChat } from "./ai-command-chat"
 import { DevelopmentSection } from "./development-section"
+import { ContactsTab } from "./contacts-tab"
+import { ConversationsTab } from "./conversations-tab"
+import type { Contact, Deal, Conversation } from "@/types"
 
 const tabs = [
   "AI COMMAND",
@@ -14,7 +17,13 @@ const tabs = [
   "ANALYTICS",
 ]
 
-export function ContentTabs() {
+interface ContentTabsProps {
+  contacts?: Contact[]
+  deals?: Deal[]
+  conversations?: Conversation[]
+}
+
+export function ContentTabs({ contacts = [], deals = [], conversations = [] }: ContentTabsProps) {
   const [activeTab, setActiveTab] = useState("AI COMMAND")
 
   return (
@@ -41,8 +50,10 @@ export function ContentTabs() {
       {/* Tab Content */}
       <div className="p-4">
         {activeTab === "AI COMMAND" && <AICommandChat />}
+        {activeTab === "CONTACTS" && <ContactsTab contacts={contacts} />}
+        {activeTab === "CONVERSATIONS" && <ConversationsTab conversations={conversations} />}
         {activeTab === "ACADEMY" && <DevelopmentSection />}
-        {activeTab !== "AI COMMAND" && activeTab !== "ACADEMY" && (
+        {!["AI COMMAND", "CONTACTS", "CONVERSATIONS", "ACADEMY"].includes(activeTab) && (
           <div className="text-center py-12 text-muted-foreground">
             <p className="text-sm">{activeTab} content coming soon...</p>
           </div>

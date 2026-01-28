@@ -34,13 +34,17 @@ import { ContactFinder } from "./modals/contact-finder"
 import { BulkUpload } from "./modals/bulk-upload"
 import { AddContactWizard } from "./modals/add-contact-wizard"
 
-// Data
-import { mockDeals, mockContacts, mockConversations } from "@/lib/mock-data"
-
 // Types
-import type { Conversation } from "@/types"
+import type { Contact, Deal, Conversation } from "@/types"
 
-export function Dashboard() {
+interface DashboardProps {
+  contacts: Contact[]
+  deals: Deal[]
+  conversations: Conversation[]
+  onRefresh?: () => void
+}
+
+export function Dashboard({ contacts, deals, conversations, onRefresh }: DashboardProps) {
   // Modal states
   const [showControlCenter, setShowControlCenter] = useState(false)
   const [showIncomeBreakdown, setShowIncomeBreakdown] = useState(false)
@@ -60,11 +64,17 @@ export function Dashboard() {
   const handleVerifyLead = (lead: unknown) => {
     console.log("[v0] Lead verified:", lead)
     setShowFinder(false)
+    onRefresh?.()
   }
 
   const handleBulkIngest = (data: unknown[]) => {
     console.log("[v0] Bulk data ingested:", data)
     setShowBulkUpload(false)
+    onRefresh?.()
+  }
+
+  const handleContactAdded = () => {
+    onRefresh?.()
   }
 
   return (
@@ -85,38 +95,38 @@ export function Dashboard() {
 
         {/* Primary Metrics Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <IncomeCard deals={mockDeals} onClick={() => setShowIncomeBreakdown(true)} />
-          <OpportunitiesCard deals={mockDeals} onClick={() => setShowOpportunitiesBreakdown(true)} />
-          <ContactsAddedCard contacts={mockContacts} onClick={() => setShowContactsBreakdown(true)} />
-          <ConversationsCard conversations={mockConversations} onClick={() => setShowConversationsBreakdown(true)} />
+          <IncomeCard deals={deals} onClick={() => setShowIncomeBreakdown(true)} />
+          <OpportunitiesCard deals={deals} onClick={() => setShowOpportunitiesBreakdown(true)} />
+          <ContactsAddedCard contacts={contacts} onClick={() => setShowContactsBreakdown(true)} />
+          <ConversationsCard conversations={conversations} onClick={() => setShowConversationsBreakdown(true)} />
         </div>
 
         {/* Secondary Status Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <WitheringCard contacts={mockContacts} onClick={() => setShowWitheringBreakdown(true)} />
-          <BreakUpsCard contacts={mockContacts} onClick={() => setShowBreakUpsBreakdown(true)} />
-          <DeadDealsCard deals={mockDeals} onClick={() => setShowDeadDealsBreakdown(true)} />
-          <DatabaseCard contacts={mockContacts} onClick={() => setShowDatabaseBreakdown(true)} />
+          <WitheringCard contacts={contacts} onClick={() => setShowWitheringBreakdown(true)} />
+          <BreakUpsCard contacts={contacts} onClick={() => setShowBreakUpsBreakdown(true)} />
+          <DeadDealsCard deals={deals} onClick={() => setShowDeadDealsBreakdown(true)} />
+          <DatabaseCard contacts={contacts} onClick={() => setShowDatabaseBreakdown(true)} />
         </div>
 
         {/* Content Tabs */}
-        <ContentTabs />
+        <ContentTabs contacts={contacts} deals={deals} conversations={conversations} />
       </main>
 
       {/* Modals */}
       {showControlCenter && <ControlCenter onClose={() => setShowControlCenter(false)} />}
-      {showIncomeBreakdown && <IncomeBreakdown deals={mockDeals} onClose={() => setShowIncomeBreakdown(false)} />}
-      {showWitheringBreakdown && <WitheringBreakdown contacts={mockContacts} onClose={() => setShowWitheringBreakdown(false)} />}
-      {showBreakUpsBreakdown && <BreakUpsBreakdown contacts={mockContacts} onClose={() => setShowBreakUpsBreakdown(false)} />}
-      {showContactsBreakdown && <ContactsAddedBreakdown contacts={mockContacts} onClose={() => setShowContactsBreakdown(false)} />}
-      {showDatabaseBreakdown && <DatabaseBreakdown contacts={mockContacts} onClose={() => setShowDatabaseBreakdown(false)} />}
-      {showDeadDealsBreakdown && <DeadDealsBreakdown deals={mockDeals} onClose={() => setShowDeadDealsBreakdown(false)} />}
-      {showConversationsBreakdown && <ActiveConversationsBreakdown conversations={mockConversations} onClose={() => setShowConversationsBreakdown(false)} />}
+      {showIncomeBreakdown && <IncomeBreakdown deals={deals} onClose={() => setShowIncomeBreakdown(false)} />}
+      {showWitheringBreakdown && <WitheringBreakdown contacts={contacts} onClose={() => setShowWitheringBreakdown(false)} />}
+      {showBreakUpsBreakdown && <BreakUpsBreakdown contacts={contacts} onClose={() => setShowBreakUpsBreakdown(false)} />}
+      {showContactsBreakdown && <ContactsAddedBreakdown contacts={contacts} onClose={() => setShowContactsBreakdown(false)} />}
+      {showDatabaseBreakdown && <DatabaseBreakdown contacts={contacts} onClose={() => setShowDatabaseBreakdown(false)} />}
+      {showDeadDealsBreakdown && <DeadDealsBreakdown deals={deals} onClose={() => setShowDeadDealsBreakdown(false)} />}
+      {showConversationsBreakdown && <ActiveConversationsBreakdown conversations={conversations} onClose={() => setShowConversationsBreakdown(false)} />}
       {showRadar && <RadarScan onClose={() => setShowRadar(false)} />}
       {showScanner && <Scanner onClose={() => setShowScanner(false)} />}
       {showFinder && <ContactFinder onClose={() => setShowFinder(false)} onVerify={handleVerifyLead} />}
       {showBulkUpload && <BulkUpload onClose={() => setShowBulkUpload(false)} onIngest={handleBulkIngest} />}
-      {showAddContact && <AddContactWizard onClose={() => setShowAddContact(false)} />}
+      {showAddContact && <AddContactWizard onClose={() => setShowAddContact(false)} onSuccess={handleContactAdded} />}
     </div>
   )
 }

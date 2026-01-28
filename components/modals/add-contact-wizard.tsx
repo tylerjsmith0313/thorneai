@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { X, User, ChevronLeft, ChevronRight, Check, Building2, Mail, Phone, Globe, Users, Sparkles } from "lucide-react"
+import { useState, useTransition } from "react"
+import { X, User, ChevronLeft, ChevronRight, Check, Globe, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
+import { createContactAction } from "@/app/actions"
 
 interface AddContactWizardProps {
   onClose: () => void
+  onSuccess?: () => void
   initialData?: Partial<WizardFormData>
 }
 
@@ -22,11 +24,13 @@ export interface WizardFormData {
   phone: string
   company: string
   companyUrl: string
+  jobTitle: string
   employees: string
   locations: string
   channels: string[]
   budget: number
   mode: "manual" | "flow"
+  source: string
 }
 
 const steps: { id: WizardStep; label: string }[] = [
@@ -38,10 +42,12 @@ const steps: { id: WizardStep; label: string }[] = [
   { id: "finalize", label: "Finalize" }
 ]
 
-export function AddContactWizard({ onClose, initialData }: AddContactWizardProps) {
+export function AddContactWizard({ onClose, onSuccess, initialData }: AddContactWizardProps) {
   const [step, setStep] = useState<WizardStep>("details")
+  const [isPending, startTransition] = useTransition()
   const [loading, setLoading] = useState(false)
   const [campaignIdeas, setCampaignIdeas] = useState<string>("")
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<WizardFormData>({
     firstName: initialData?.firstName || "",
     lastName: initialData?.lastName || "",
@@ -50,18 +56,20 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
     phone: initialData?.phone || "",
     company: initialData?.company || "",
     companyUrl: initialData?.companyUrl || "",
+    jobTitle: initialData?.jobTitle || "",
     employees: "",
     locations: "",
     channels: [],
     budget: 50,
-    mode: "manual"
+    mode: "manual",
+    source: "Manual Entry"
   })
 
   const currentIdx = steps.findIndex(s => s.id === step)
 
   const handleNext = () => {
     if (currentIdx === steps.length - 1) {
-      onClose()
+      handleSubmit()
     } else {
       const nextStep = steps[currentIdx + 1].id
       setStep(nextStep)
@@ -75,6 +83,29 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
     if (currentIdx > 0) {
       setStep(steps[currentIdx - 1].id)
     }
+  }
+
+  const handleSubmit = () => {
+    setError(null)
+    startTransition(async () => {
+      const result = await createContactAction({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.wEmail || formData.pEmail,
+        company: formData.company,
+        jobTitle: formData.jobTitle,
+        phone: formData.phone,
+        source: formData.source,
+        status: "New",
+      })
+
+      if (result.error) {
+        setError(result.error)
+      } else {
+        onSuccess?.()
+        onClose()
+      }
+    })
   }
 
   const generateCampaign = async () => {
@@ -96,6 +127,17 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
         ? prev.channels.filter(c => c !== channel)
         : [...prev.channels, channel]
     }))
+  }
+
+  const isStepValid = () => {
+    switch (step) {
+      case "details":
+        return formData.firstName.trim() && formData.lastName.trim() && (formData.pEmail.trim() || formData.wEmail.trim())
+      case "company":
+        return formData.company.trim()
+      default:
+        return true
+    }
   }
 
   return (
@@ -143,6 +185,13 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mx-8 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-8">
           {step === "details" && (
@@ -150,27 +199,33 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
               <h3 className="text-lg font-black text-slate-900">Contact Details</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>First Name</Label>
+                  <Label>First Name *</Label>
                   <Input value={formData.firstName} onChange={(e) => updateData({ firstName: e.target.value })} placeholder="John" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Last Name</Label>
+                  <Label>Last Name *</Label>
                   <Input value={formData.lastName} onChange={(e) => updateData({ lastName: e.target.value })} placeholder="Doe" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Personal Email</Label>
-                  <Input value={formData.pEmail} onChange={(e) => updateData({ pEmail: e.target.value })} placeholder="john@personal.com" />
+                  <Input value={formData.pEmail} onChange={(e) => updateData({ pEmail: e.target.value })} placeholder="john@personal.com" type="email" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Work Email</Label>
-                  <Input value={formData.wEmail} onChange={(e) => updateData({ wEmail: e.target.value })} placeholder="john@company.com" />
+                  <Label>Work Email *</Label>
+                  <Input value={formData.wEmail} onChange={(e) => updateData({ wEmail: e.target.value })} placeholder="john@company.com" type="email" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Phone Number</Label>
-                <Input value={formData.phone} onChange={(e) => updateData({ phone: e.target.value })} placeholder="+1 (555) 000-0000" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input value={formData.phone} onChange={(e) => updateData({ phone: e.target.value })} placeholder="+1 (555) 000-0000" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Job Title</Label>
+                  <Input value={formData.jobTitle} onChange={(e) => updateData({ jobTitle: e.target.value })} placeholder="VP of Sales" />
+                </div>
               </div>
             </div>
           )}
@@ -202,7 +257,7 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
               <h3 className="text-lg font-black text-slate-900">Company Information</h3>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Company Name</Label>
+                  <Label>Company Name *</Label>
                   <Input value={formData.company} onChange={(e) => updateData({ company: e.target.value })} placeholder="Acme Corp" />
                 </div>
                 <div className="space-y-2">
@@ -286,6 +341,30 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
           {step === "finalize" && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h3 className="text-lg font-black text-slate-900">Finalize & Deploy</h3>
+              
+              {/* Summary */}
+              <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200">
+                <h4 className="font-black text-slate-900 mb-4">Contact Summary</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-slate-500">Name</p>
+                    <p className="font-bold text-slate-900">{formData.firstName} {formData.lastName}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Company</p>
+                    <p className="font-bold text-slate-900">{formData.company}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Email</p>
+                    <p className="font-bold text-slate-900">{formData.wEmail || formData.pEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Channels</p>
+                    <p className="font-bold text-slate-900">{formData.channels.length > 0 ? formData.channels.join(", ") : "None selected"}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <Label>Engagement Mode</Label>
                 <div className="grid grid-cols-2 gap-4">
@@ -322,15 +401,28 @@ export function AddContactWizard({ onClose, initialData }: AddContactWizardProps
           <Button
             variant="outline"
             onClick={handleBack}
-            disabled={currentIdx === 0}
+            disabled={currentIdx === 0 || isPending}
             className="gap-2 bg-transparent"
           >
             <ChevronLeft size={16} />
             Back
           </Button>
-          <Button onClick={handleNext} className="gap-2">
-            {currentIdx === steps.length - 1 ? "Deploy Contact" : "Continue"}
-            {currentIdx < steps.length - 1 && <ChevronRight size={16} />}
+          <Button 
+            onClick={handleNext} 
+            className="gap-2"
+            disabled={!isStepValid() || isPending}
+          >
+            {isPending ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                {currentIdx === steps.length - 1 ? "Deploy Contact" : "Continue"}
+                {currentIdx < steps.length - 1 && <ChevronRight size={16} />}
+              </>
+            )}
           </Button>
         </div>
       </div>
