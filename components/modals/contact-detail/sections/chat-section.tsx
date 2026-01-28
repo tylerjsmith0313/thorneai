@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Send, Zap, MessageSquare, CheckCircle, Link2, Loader2 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
+import { communicationManager } from "@/lib/services/communication-manager"
 import type { Contact } from "@/types"
 
 interface ChatSectionProps {
@@ -26,13 +27,16 @@ export function ChatSection({ contact }: ChatSectionProps) {
     if (!message || isSending) return
     setIsSending(true)
 
-    // Simulate sending via communication manager
-    // In production, this would call the server action
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    setLastSent(message)
-    setMessage("")
-    setIsSending(false)
+    try {
+      // Send via communication manager
+      await communicationManager.sendMessage(contact.id, "email", message)
+      setLastSent(message)
+      setMessage("")
+    } catch (error) {
+      console.error("[v0] Failed to send message:", error)
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleSendBookingLink = async () => {
@@ -40,11 +44,15 @@ export function ChatSection({ contact }: ChatSectionProps) {
     const link = getBookingLink()
     const bookingMessage = `Hi ${contact.firstName},\n\nI'd like to find some time for us to connect further. You can view my real-time availability and grab a slot that works for you here:\n\n${link}\n\nLooking forward to it,\nThorne Intelligence Core`
 
-    // Simulate sending
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    setLastSent(`Sent booking request: ${link}`)
-    setIsSending(false)
+    try {
+      // Send via communication manager
+      await communicationManager.sendBookingLink(contact.id, link)
+      setLastSent(`Sent booking request: ${link}`)
+    } catch (error) {
+      console.error("[v0] Failed to send booking link:", error)
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (

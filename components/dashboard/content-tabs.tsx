@@ -5,6 +5,9 @@ import { AICommandChat } from "./ai-command-chat"
 import { DevelopmentSection } from "./development-section"
 import { ContactsTab } from "./contacts-tab"
 import { ConversationsTab } from "./conversations-tab"
+import { CalendarSection } from "./calendar-section"
+import { AnalyticsSection } from "./analytics-section"
+import { CreativeSuite } from "@/components/creative/creative-suite"
 import type { Contact, Deal, Conversation } from "@/types"
 
 const tabs = [
@@ -52,12 +55,10 @@ export function ContentTabs({ contacts = [], deals = [], conversations = [] }: C
         {activeTab === "AI COMMAND" && <AICommandChat />}
         {activeTab === "CONTACTS" && <ContactsTab contacts={contacts} />}
         {activeTab === "CONVERSATIONS" && <ConversationsTab conversations={conversations} />}
+        {activeTab === "CALENDAR" && <CalendarSection />}
         {activeTab === "ACADEMY" && <DevelopmentSection />}
-        {!["AI COMMAND", "CONTACTS", "CONVERSATIONS", "ACADEMY"].includes(activeTab) && (
-          <div className="text-center py-12 text-muted-foreground">
-            <p className="text-sm">{activeTab} content coming soon...</p>
-          </div>
-        )}
+        {activeTab === "CREATIVE" && <CreativeSuite />}
+        {activeTab === "ANALYTICS" && <AnalyticsSection />}
       </div>
     </div>
   )
