@@ -1,122 +1,52 @@
 "use client"
 
-import { User, Mail, Phone, Building, Briefcase, Save } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Save, User, Mail, Building2, Phone, Briefcase } from "lucide-react"
+import { BaseButton } from "@/components/ui/base-button"
+import { BaseInput } from "@/components/ui/base-input"
 
 export function UserSettings() {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
+    <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Account Details</h2>
-          <p className="text-muted-foreground">Manage your identity within the Thorne ecosystem.</p>
+          <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Account Details</h3>
+          <p className="text-sm text-slate-500 mt-1">Manage your identity within the Thorne ecosystem.</p>
         </div>
-        <Button className="bg-thorne-indigo hover:bg-thorne-indigo/90 text-white">
-          <Save className="w-4 h-4 mr-2" />
-          Save Changes
-        </Button>
+        <BaseButton variant="primary" icon={<Save size={18} />}>Save Changes</BaseButton>
       </div>
 
-      <div className="space-y-6">
-        {/* Name Row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] font-medium text-muted-foreground tracking-wider block mb-2">
-              FIRST NAME
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                defaultValue="Thorne"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] font-medium text-muted-foreground tracking-wider block mb-2">
-              LAST NAME
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                defaultValue="AI"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
+      <div className="grid grid-cols-2 gap-8">
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">First Name</label>
+          <BaseInput defaultValue="Thorne" icon={<User size={16} />} />
         </div>
-
-        {/* Email */}
-        <div>
-          <label className="text-[10px] font-medium text-thorne-danger tracking-wider block mb-2">
-            EMAIL ADDRESS
-          </label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              defaultValue="commander@thorne.ai"
-              className="pl-10 bg-secondary border-none h-12 rounded-xl"
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Last Name</label>
+          <BaseInput defaultValue="AI" icon={<User size={16} />} />
         </div>
-
-        {/* Phone Row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] font-medium text-thorne-danger tracking-wider block mb-2">
-              OFFICE PHONE
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="+1 (555) 000-0000"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] font-medium text-thorne-danger tracking-wider block mb-2">
-              CELL PHONE
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="+1 (555) 000-0000"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
+        <div className="col-span-2 space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+          <BaseInput type="email" defaultValue="commander@thorne.ai" icon={<Mail size={16} />} />
         </div>
-
-        {/* Company Row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] font-medium text-muted-foreground tracking-wider block mb-2">
-              COMPANY
-            </label>
-            <div className="relative">
-              <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                defaultValue="Thorne Intelligence"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] font-medium text-muted-foreground tracking-wider block mb-2">
-              JOB TITLE
-            </label>
-            <div className="relative">
-              <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                defaultValue="Chief Revenue Officer"
-                className="pl-10 bg-secondary border-none h-12 rounded-xl"
-              />
-            </div>
-          </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Office Phone</label>
+          <BaseInput type="tel" placeholder="+1 (555) 000-0000" icon={<Phone size={16} />} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cell Phone</label>
+          <BaseInput type="tel" placeholder="+1 (555) 000-0000" icon={<Phone size={16} />} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Company</label>
+          <BaseInput defaultValue="Thorne Intelligence" icon={<Building2 size={16} />} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Job Title</label>
+          <BaseInput defaultValue="Chief Revenue Officer" icon={<Briefcase size={16} />} />
         </div>
       </div>
     </div>
   )
 }
+
+export default UserSettings

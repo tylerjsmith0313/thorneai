@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { ShoppingBag, Plus, MoreVertical } from "lucide-react"
+import { BaseButton } from "@/components/ui/base-button"
 import { AddProductModal } from "./add-product-modal"
 
 interface Product {
@@ -37,10 +37,9 @@ export function ProductPortfolio() {
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Product Portfolio</h3>
           <p className="text-sm text-slate-500 mt-1">Configure the offers Thorne will present to leads.</p>
         </div>
-        <Button variant="secondary" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => setIsAddModalOpen(true)}>
-          <Plus size={18} className="mr-2" />
+        <BaseButton variant="dark" icon={<Plus size={18} />} onClick={() => setIsAddModalOpen(true)}>
           Add Product
-        </Button>
+        </BaseButton>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
@@ -54,7 +53,13 @@ export function ProductPortfolio() {
   )
 }
 
-function ProductCard({ name, price, type }: { name: string; price: string; type: string }) {
+interface ProductCardProps {
+  name: string
+  price: string
+  type: string
+}
+
+function ProductCard({ name, price, type }: ProductCardProps) {
   return (
     <div className="group p-8 bg-slate-50 border border-slate-200 rounded-[40px] hover:bg-white hover:shadow-2xl hover:border-indigo-100 transition-all flex items-center justify-between">
       <div className="flex items-center gap-6">
@@ -69,12 +74,12 @@ function ProductCard({ name, price, type }: { name: string; price: string; type:
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm">
+        <BaseButton variant="outline" size="sm">
           Creative Studio
-        </Button>
-        <Button variant="secondary" size="sm">
+        </BaseButton>
+        <BaseButton variant="secondary" size="sm">
           Edit Details
-        </Button>
+        </BaseButton>
         <button className="p-2 text-slate-300 hover:text-slate-600 transition-colors">
           <MoreVertical size={20} />
         </button>
@@ -82,3 +87,5 @@ function ProductCard({ name, price, type }: { name: string; price: string; type:
     </div>
   )
 }
+
+export default ProductPortfolio
