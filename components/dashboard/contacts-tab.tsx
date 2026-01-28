@@ -1,28 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Filter, MoreVertical, Mail, Phone, Building2, User } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { Search, Filter, Plus, MoreHorizontal, Building2, MapPin } from "lucide-react"
 import type { Contact } from "@/types"
+import { ContactSlideout } from "@/components/modals/contact-slideout/contact-slideout"
+import { AddContactWizard } from "@/components/modals/add-contact-wizard"
 
 interface ContactsTabProps {
   contacts: Contact[]
 }
 
-const statusColors: Record<string, string> = {
-  New: "bg-blue-100 text-blue-700",
-  Hot: "bg-orange-100 text-orange-700",
-  Withering: "bg-amber-100 text-amber-700",
-  Dead: "bg-slate-200 text-slate-600",
-  "Needs Update": "bg-purple-100 text-purple-700",
-  Retouch: "bg-cyan-100 text-cyan-700",
-  Recapture: "bg-emerald-100 text-emerald-700",
+const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
+  Hot: { label: "HOT", color: "bg-rose-50 text-rose-600 border-rose-100", dot: "bg-rose-500" },
+  New: { label: "NEW", color: "bg-sky-50 text-sky-600 border-sky-100", dot: "bg-sky-500" },
+  Withering: { label: "WITHERING", color: "bg-amber-50 text-amber-600 border-amber-100", dot: "bg-amber-500" },
+  Recapture: { label: "RECAPTURE", color: "bg-violet-50 text-violet-600 border-violet-100", dot: "bg-violet-500" },
+  Dead: { label: "DEAD", color: "bg-slate-100 text-slate-500 border-slate-200", dot: "bg-slate-400" },
+  "Needs Update": { label: "NEEDS UPDATE", color: "bg-yellow-50 text-yellow-600 border-yellow-100", dot: "bg-yellow-500" },
+  Retouch: { label: "RETOUCH", color: "bg-teal-50 text-teal-600 border-teal-100", dot: "bg-teal-500" },
 }
 
 export function ContactsTab({ contacts }: ContactsTabProps) {
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [showAddContact, setShowAddContact] = useState(false)
 
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
@@ -30,120 +31,131 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
       `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
       contact.email.toLowerCase().includes(search.toLowerCase()) ||
       contact.company.toLowerCase().includes(search.toLowerCase())
-
-    const matchesStatus = !statusFilter || contact.status === statusFilter
-
-    return matchesSearch && matchesStatus
+    return matchesSearch
   })
 
-  const statuses = Array.from(new Set(contacts.map((c) => c.status)))
+  const getStatusBadge = (status: string) => {
+    const config = statusConfig[status] || statusConfig.New
+    return (
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${config.color}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+        {config.label}
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search contacts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Verified Database</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Human-verified leads and engagement nodes.</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={statusFilter === null ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter(null)}
-            className={statusFilter === null ? "" : "bg-transparent"}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search contacts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm w-56 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            />
+          </div>
+          <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all">
+            <Filter className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowAddContact(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-all"
           >
-            All ({contacts.length})
-          </Button>
-          {statuses.map((status) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter(status)}
-              className={statusFilter === status ? "" : "bg-transparent"}
-            >
-              {status} ({contacts.filter((c) => c.status === status).length})
-            </Button>
-          ))}
+            <Plus className="w-4 h-4" />
+            New Lead
+          </button>
         </div>
       </div>
 
-      {/* Contact List */}
+      {/* Contact Grid */}
       {filteredContacts.length === 0 ? (
-        <div className="text-center py-12">
-          <User className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 font-medium">No contacts found</p>
+        <div className="text-center py-16">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Search className="w-6 h-6 text-slate-400" />
+          </div>
+          <p className="text-slate-600 font-medium">No contacts found</p>
           <p className="text-slate-400 text-sm mt-1">
             {search ? "Try a different search term" : "Add your first contact to get started"}
           </p>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredContacts.map((contact) => (
             <div
               key={contact.id}
-              className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
+              onClick={() => setSelectedContact(contact)}
+              className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-lg hover:border-indigo-200 transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
-                    {contact.firstName[0]}
-                    {contact.lastName[0]}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-900">
-                        {contact.firstName} {contact.lastName}
-                      </h3>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColors[contact.status]}`}>
-                        {contact.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Building2 className="w-3 h-3" />
-                        {contact.company}
-                      </span>
-                      {contact.jobTitle && (
-                        <span className="text-slate-400">{contact.jobTitle}</span>
-                      )}
-                    </div>
-                  </div>
+              {/* Avatar and Status */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                  {contact.firstName[0]}{contact.lastName[0]}
                 </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600">
-                    <Mail className="w-4 h-4" />
-                  </Button>
-                  {contact.phone && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600">
-                      <Phone className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                {getStatusBadge(contact.status)}
+              </div>
+
+              {/* Name and Details */}
+              <div className="space-y-2 mb-5">
+                <h4 className="text-base font-bold text-slate-900">{contact.firstName} {contact.lastName}</h4>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                    <Building2 size={12} className="text-slate-300" />
+                    {contact.company || "No company"}
+                  </p>
+                  <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                    <MapPin size={12} className="text-slate-300" />
+                    {contact.source || "New York, NY"}
+                  </p>
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                <span>Added {new Date(contact.addedDate).toLocaleDateString()}</span>
-                {contact.lastContactDate && (
-                  <span>Last contact: {new Date(contact.lastContactDate).toLocaleDateString()}</span>
-                )}
-                {contact.engagementScore !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <span className="text-indigo-600 font-bold">{contact.engagementScore}%</span> engagement
-                  </span>
-                )}
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Last Contact</p>
+                  <p className="text-xs font-bold text-slate-700 mt-0.5">
+                    {contact.lastContactDate 
+                      ? new Date(contact.lastContactDate).toLocaleDateString("en-CA")
+                      : "Never"}
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                  }}
+                  className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
+                >
+                  <MoreHorizontal size={18} />
+                </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Contact Slideout */}
+      {selectedContact && (
+        <ContactSlideout
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+        />
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContact && (
+        <AddContactWizard
+          onClose={() => setShowAddContact(false)}
+          onComplete={() => setShowAddContact(false)}
+        />
       )}
     </div>
   )
