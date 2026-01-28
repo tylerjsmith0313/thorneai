@@ -8,7 +8,7 @@ interface DashboardHeaderProps {
   onOpenSettings: () => void
   onRadarClick?: () => void
   onScannerClick?: () => void
-  onBulkUploadClick?: () => void
+  onBulkClick?: () => void
   onFinderClick?: () => void
   onAddContactClick?: () => void
 }
@@ -17,7 +17,7 @@ export function DashboardHeader({
   onOpenSettings,
   onRadarClick,
   onScannerClick,
-  onBulkUploadClick,
+  onBulkClick,
   onFinderClick,
   onAddContactClick
 }: DashboardHeaderProps) {
@@ -51,10 +51,10 @@ export function DashboardHeader({
               onClick={onScannerClick} 
               color="text-emerald-500"
             />
-            <ToolIconButton 
+<ToolIconButton 
               icon={<Upload className="w-4 h-4" />} 
               label="Bulk" 
-              onClick={onBulkUploadClick} 
+              onClick={onBulkClick} 
               color="text-rose-500"
             />
             <ToolIconButton 
