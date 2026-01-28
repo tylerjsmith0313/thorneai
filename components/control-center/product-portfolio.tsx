@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ShoppingBag, Plus, EllipsisVertical as MoreVertical, Loader2, Trash2 } from "lucide-react"
+import { ShoppingBag, Plus, EllipsisVertical, Loader2, Trash2 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { AddProductModal } from "./add-product-modal"
 import { createClient } from "@/lib/supabase/client"
-import EllipsisVertical from "lucide-react" // Import EllipsisVertical
 
 interface Product {
   id: string
