@@ -18,7 +18,15 @@ interface TenantUser {
   user_id: string
   email: string
   full_name: string | null
-  role: "admin" | "user"
+  role: "admin" | "user" | "manager" | "director" | "vp" | "it" | "marketing"
+  tenant_id: string | null
+}
+
+// Extract domain from email address
+function extractDomain(email: string | null | undefined): string | null {
+  if (!email) return null
+  const parts = email.split("@")
+  return parts.length === 2 ? parts[1].toLowerCase() : null
 }
 
 interface ProfileSectionProps {
@@ -50,13 +58,42 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
   
   const supabase = createClient()
 
-  // Load team users on mount
+  // Load team users filtered by contact's company email domain
   useEffect(() => {
     async function loadTeamUsers() {
       setLoadingUsers(true)
+      
+      // Extract domain from contact's email
+      const contactDomain = extractDomain(contact.email)
+      
+      if (contactDomain) {
+        // First, find the tenant that has this domain
+        const { data: tenant } = await supabase
+          .from("tenants")
+          .select("id")
+          .eq("domain", contactDomain)
+          .single()
+        
+        if (tenant) {
+          // Get users assigned to this tenant
+          const { data } = await supabase
+            .from("tenant_users")
+            .select("id, user_id, email, full_name, role, tenant_id")
+            .eq("tenant_id", tenant.id)
+            .order("full_name", { ascending: true })
+          
+          if (data) {
+            setTeamUsers(data)
+            setLoadingUsers(false)
+            return
+          }
+        }
+      }
+      
+      // Fallback: load all users if no domain match found
       const { data } = await supabase
         .from("tenant_users")
-        .select("id, user_id, email, full_name, role")
+        .select("id, user_id, email, full_name, role, tenant_id")
         .order("full_name", { ascending: true })
       
       if (data) {
@@ -65,7 +102,7 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
       setLoadingUsers(false)
     }
     loadTeamUsers()
-  }, [])
+  }, [contact.email])
 
   // Handle assignment change
   async function handleAssignUser(userId: string | null) {
@@ -193,9 +230,16 @@ ${hasAddress ? `4. **Physical Touchpoint**
             {showAssignDropdown && (
               <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
                 <div className="p-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <Users size={12} />
-                    Team Members
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <Users size={12} />
+                      Team Members
+                    </div>
+                    {extractDomain(contact.email) && (
+                      <span className="text-[9px] font-medium text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        @{extractDomain(contact.email)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto">
@@ -240,7 +284,9 @@ ${hasAddress ? `4. **Physical Touchpoint**
                   
                   {teamUsers.length === 0 && !loadingUsers && (
                     <div className="p-4 text-center text-[11px] text-slate-500">
-                      No team members found. Add users in Admin Settings.
+                      {extractDomain(contact.email) 
+                        ? `No team members assigned to @${extractDomain(contact.email)}. Add users in Admin Center.`
+                        : "No team members found. Add users in Admin Center."}
                     </div>
                   )}
                 </div>
