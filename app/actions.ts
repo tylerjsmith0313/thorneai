@@ -14,13 +14,30 @@ export async function createContactAction(formData: {
   phone?: string
   source?: string
   status?: ContactStatus
+  // Address fields (optional)
+  streetAddress?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  country?: string
+  companyAddress?: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
-    return { error: "Not authenticated" }
+    return { error: "Not authenticated", success: false }
   }
+
+  // Combine address fields into a single address string for database
+  const addressParts = [
+    formData.streetAddress,
+    formData.city,
+    formData.state,
+    formData.zipCode,
+    formData.country
+  ].filter(Boolean)
+  const fullAddress = addressParts.length > 0 ? addressParts.join(", ") : null
 
   const { data, error } = await supabase
     .from("contacts")
@@ -32,6 +49,7 @@ export async function createContactAction(formData: {
       company: formData.company,
       job_title: formData.jobTitle,
       phone: formData.phone,
+      address: fullAddress,
       source: formData.source,
       status: formData.status || "New",
       added_date: new Date().toISOString().split("T")[0],
@@ -54,7 +72,7 @@ export async function createContactAction(formData: {
   })
 
   revalidatePath("/")
-  return { data }
+  return { data, success: true }
 }
 
 export async function updateContactAction(

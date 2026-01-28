@@ -5,7 +5,7 @@ import React from "react"
 import { useState } from "react"
 import { 
   Mail, Phone, Globe, Building2, MapPin, Linkedin, Twitter, Instagram, Facebook, Youtube, Share2,
-  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, X, BrainCircuit, Zap
+  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle
 } from "lucide-react"
 import type { Contact } from "@/types"
 import { ThorneInsightBox } from "../common/thorne-insight-box"
@@ -16,12 +16,12 @@ interface ProfileSectionProps {
 }
 
 const outreachChannels = [
-  { id: "LinkedIn", icon: Linkedin },
-  { id: "Email", icon: Mail },
-  { id: "SMS", icon: Smartphone },
-  { id: "Physical Gift", icon: Gift },
-  { id: "Post Card", icon: Send },
-  { id: "Direct Visit", icon: MapPin },
+  { id: "LinkedIn", icon: Linkedin, requiresAddress: false },
+  { id: "Email", icon: Mail, requiresAddress: false },
+  { id: "SMS", icon: Smartphone, requiresAddress: false },
+  { id: "Physical Gift", icon: Gift, requiresAddress: true },
+  { id: "Post Card", icon: Send, requiresAddress: true },
+  { id: "Direct Visit", icon: MapPin, requiresAddress: true },
 ]
 
 export function ProfileSection({ contact }: ProfileSectionProps) {
@@ -32,7 +32,21 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
   const [strategyLoading, setStrategyLoading] = useState(false)
   const [strategy, setStrategy] = useState<string | null>(null)
 
+  // Check if contact has an address (supports both UI type and DB type)
+  const hasAddress = Boolean(
+    contact.streetAddress || 
+    contact.address || 
+    (contact as any).street_address
+  )
+
   const toggleChannel = (ch: string) => {
+    const channel = outreachChannels.find(c => c.id === ch)
+    
+    // Prevent selecting physical channels if no address
+    if (channel?.requiresAddress && !hasAddress) {
+      return
+    }
+    
     setSelectedChannels(prev => 
       prev.includes(ch) ? prev.filter(c => c !== ch) : [...prev, ch]
     )
@@ -43,19 +57,26 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
     setShowStrategy(true)
     // Simulate AI generation
     await new Promise(r => setTimeout(r, 2000))
+    
+    const availableChannels = selectedChannels.filter(ch => {
+      const channel = outreachChannels.find(c => c.id === ch)
+      return !channel?.requiresAddress || hasAddress
+    })
+    
     setStrategy(`Based on ${contact.firstName}'s profile at ${contact.company || "their company"}:
 
-1. **Initial Contact via ${selectedChannels[0] || "Email"}**
+1. **Initial Contact via ${availableChannels[0] || "Email"}**
    Start with a personalized message referencing their recent activity.
 
 2. **Value-First Approach**
    Share industry insights relevant to their role as ${contact.jobTitle || "a decision maker"}.
 
 3. **Multi-Touch Sequence**
-   Plan ${selectedChannels.length} touchpoints across ${selectedChannels.join(", ")} over 3 weeks.
+   Plan ${availableChannels.length} touchpoints across ${availableChannels.join(", ")} over 3 weeks.
 
-4. **Budget Allocation**
-   With your $${budget} budget, consider a thoughtful gift after the third touchpoint.
+${hasAddress ? `4. **Physical Touchpoint**
+   With address on file, consider a thoughtful gift after the third touchpoint ($${budget} budget).` : `4. **Note: Physical Channels Unavailable**
+   Add a mailing address to enable gifts, postcards, and visits.`}
 
 5. **Timing Optimization**
    Best outreach windows: Tuesday-Thursday, 9-11 AM local time.`)
@@ -65,7 +86,7 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <ThorneInsightBox 
-        insight={`"This contact is showing 'Hot' signals through LinkedIn activity. Suggested next step: Send a personalized physical gift based on their interests."`} 
+        insight={`"This contact is showing 'Hot' signals through LinkedIn activity. Suggested next step: ${hasAddress ? "Send a personalized physical gift based on their interests." : "Consider a LinkedIn message or email outreach."}"`} 
       />
 
       {/* Verified Information */}
@@ -82,6 +103,30 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
           <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} />
           <InfoItem label="Company" value={contact.company || "Not set"} icon={<Building2 size={14} />} />
           <InfoItem label="Job Title" value={contact.jobTitle || "Not set"} icon={<Globe size={14} />} />
+        </div>
+
+        {/* Address Section */}
+        <div className="pt-5 border-t border-slate-100">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Address</h4>
+          {hasAddress ? (
+            <div className="flex items-start gap-3">
+              <MapPin size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+              <p className="text-[12px] font-medium text-slate-700">
+                {contact.streetAddress || contact.address || (contact as any).street_address}
+                {contact.city && `, ${contact.city}`}
+                {contact.state && `, ${contact.state}`}
+                {contact.zipCode && ` ${contact.zipCode}`}
+                {contact.country && `, ${contact.country}`}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+              <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
+              <p className="text-[11px] text-amber-700">
+                No address on file. Add an address to enable direct mail, gifts, and visits.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Social Media */}
@@ -115,24 +160,46 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
           </button>
         </div>
 
+        {!hasAddress && (
+          <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+            <AlertCircle size={14} className="text-slate-400 flex-shrink-0" />
+            <p className="text-[10px] text-slate-500">
+              Physical channels (gifts, postcards, visits) disabled - no address on file
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-3">
-          {outreachChannels.map(ch => (
-            <button
-              key={ch.id}
-              onClick={() => isEditingChannels && toggleChannel(ch.id)}
-              disabled={!isEditingChannels}
-              className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all ${
-                selectedChannels.includes(ch.id)
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-lg"
-                  : isEditingChannels
-                    ? "bg-white text-slate-400 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30 cursor-pointer"
-                    : "bg-slate-50 text-slate-300 border-slate-100"
-              }`}
-            >
-              <ch.icon size={18} />
-              <span className="text-[9px] font-bold uppercase tracking-wider">{ch.id}</span>
-            </button>
-          ))}
+          {outreachChannels.map(ch => {
+            const isDisabled = ch.requiresAddress && !hasAddress
+            const isSelected = selectedChannels.includes(ch.id)
+            
+            return (
+              <button
+                key={ch.id}
+                onClick={() => isEditingChannels && toggleChannel(ch.id)}
+                disabled={!isEditingChannels || isDisabled}
+                title={isDisabled ? "Add address to enable this channel" : undefined}
+                className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all relative ${
+                  isDisabled
+                    ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-50"
+                    : isSelected
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-lg"
+                      : isEditingChannels
+                        ? "bg-white text-slate-400 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30 cursor-pointer"
+                        : "bg-slate-50 text-slate-300 border-slate-100"
+                }`}
+              >
+                <ch.icon size={18} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{ch.id}</span>
+                {isDisabled && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center">
+                    <AlertCircle size={10} className="text-white" />
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {/* Budget Slider */}

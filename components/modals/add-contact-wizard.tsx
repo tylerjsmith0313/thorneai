@@ -5,7 +5,7 @@ import { createContactAction } from "@/app/actions"
 import { WizardHeader } from "./wizard/wizard-header"
 import { WizardFooter } from "./wizard/wizard-footer"
 import { BaseInput } from "@/components/ui/base-input"
-import { User, Mail, Phone, Building2, Briefcase, Globe } from "lucide-react"
+import { User, Mail, Phone, Building2, Briefcase, MapPin, ChevronDown, ChevronUp } from "lucide-react"
 
 interface AddContactWizardProps {
   onClose: () => void
@@ -20,6 +20,13 @@ export interface WizardFormData {
   company: string
   jobTitle: string
   source: string
+  // Address fields (optional)
+  streetAddress: string
+  city: string
+  state: string
+  zipCode: string
+  country: string
+  companyAddress: string
 }
 
 const defaultFormData: WizardFormData = {
@@ -29,19 +36,28 @@ const defaultFormData: WizardFormData = {
   phone: "",
   company: "",
   jobTitle: "",
-  source: "manual"
+  source: "manual",
+  streetAddress: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  country: "",
+  companyAddress: ""
 }
 
 export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<WizardFormData>(defaultFormData)
+  const [showAddressFields, setShowAddressFields] = useState(false)
 
   const updateData = (updates: Partial<WizardFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
   }
 
   const isValid = formData.firstName.trim() && formData.lastName.trim() && formData.email.trim()
+
+  const hasAddress = formData.streetAddress.trim() || formData.city.trim()
 
   const handleSubmit = () => {
     if (!isValid) {
@@ -59,6 +75,12 @@ export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) 
           company: formData.company,
           jobTitle: formData.jobTitle,
           source: formData.source,
+          streetAddress: formData.streetAddress,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: formData.country,
+          companyAddress: formData.companyAddress,
           status: "New"
         })
         
@@ -171,6 +193,88 @@ export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) 
                 <option value="website">Website</option>
                 <option value="cold_outreach">Cold Outreach</option>
               </select>
+            </div>
+
+            {/* Collapsible Address Section */}
+            <div className="border-t border-slate-100 pt-5">
+              <button
+                type="button"
+                onClick={() => setShowAddressFields(!showAddressFields)}
+                className="w-full flex items-center justify-between text-left group"
+              >
+                <div className="flex items-center gap-2">
+                  <MapPin size={16} className="text-slate-400" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Address (Optional)
+                  </span>
+                  {hasAddress && (
+                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      Added
+                    </span>
+                  )}
+                </div>
+                {showAddressFields ? (
+                  <ChevronUp size={16} className="text-slate-400" />
+                ) : (
+                  <ChevronDown size={16} className="text-slate-400" />
+                )}
+              </button>
+
+              {!showAddressFields && (
+                <p className="text-[11px] text-slate-400 mt-2 ml-6">
+                  Add address to enable physical mail, gifts, and visits
+                </p>
+              )}
+
+              {showAddressFields && (
+                <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                  <BaseInput
+                    label="Street Address"
+                    placeholder="123 Main Street, Suite 100"
+                    value={formData.streetAddress}
+                    onChange={e => updateData({ streetAddress: e.target.value })}
+                    icon={<MapPin size={16} />}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <BaseInput
+                      label="City"
+                      placeholder="San Francisco"
+                      value={formData.city}
+                      onChange={e => updateData({ city: e.target.value })}
+                    />
+                    <BaseInput
+                      label="State/Province"
+                      placeholder="CA"
+                      value={formData.state}
+                      onChange={e => updateData({ state: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <BaseInput
+                      label="ZIP/Postal Code"
+                      placeholder="94105"
+                      value={formData.zipCode}
+                      onChange={e => updateData({ zipCode: e.target.value })}
+                    />
+                    <BaseInput
+                      label="Country"
+                      placeholder="United States"
+                      value={formData.country}
+                      onChange={e => updateData({ country: e.target.value })}
+                    />
+                  </div>
+
+                  <BaseInput
+                    label="Company Address (if different)"
+                    placeholder="456 Business Blvd"
+                    value={formData.companyAddress}
+                    onChange={e => updateData({ companyAddress: e.target.value })}
+                    icon={<Building2 size={16} />}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

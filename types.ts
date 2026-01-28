@@ -15,7 +15,14 @@ export interface Contact {
   company: string
   jobTitle?: string
   phone?: string
-  address?: string
+  // Address fields (optional - required for physical outreach channels)
+  streetAddress?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  country?: string
+  // Company address (optional)
+  companyAddress?: string
   status: ContactStatus
   source?: string
   engagementScore?: number
