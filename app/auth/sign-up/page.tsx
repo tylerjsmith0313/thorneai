@@ -1,21 +1,35 @@
 "use client"
 
-import React from "react"
-
-import { useState } from "react"
+import React, { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calendar, Loader2, Eye, EyeOff } from "lucide-react"
+import { Calendar, Loader2, Eye, EyeOff, Check, Building2, CreditCard, ArrowLeft } from "lucide-react"
+import { getEmailValidationError, isBusinessEmail } from "@/lib/email-validation"
+
+// Dynamically import the checkout component to avoid SSR issues
+const SignupCheckout = dynamic(() => import("@/components/signup/signup-checkout"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+    </div>
+  ),
+})
+
+type Step = "details" | "payment" | "success"
 
 export default function SignUpPage() {
   const router = useRouter()
+  const [step, setStep] = useState<Step>("details")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -24,11 +38,20 @@ export default function SignUpPage() {
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }))
     setError(null)
+
+    // Real-time email validation
+    if (name === "email" && value) {
+      const emailError = getEmailValidationError(value)
+      if (emailError && value.includes("@")) {
+        setError(emailError)
+      }
+    }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -48,6 +71,18 @@ export default function SignUpPage() {
 
     if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
       setError("Username can only contain letters, numbers, and underscores")
+      return
+    }
+
+    // Email validation - must be business email
+    const emailError = getEmailValidationError(formData.email)
+    if (emailError) {
+      setError(emailError)
+      return
+    }
+
+    if (!isBusinessEmail(formData.email)) {
+      setError("Please use a corporate or business email address. Personal email addresses are not allowed.")
       return
     }
 
@@ -100,7 +135,9 @@ export default function SignUpPage() {
       }
 
       if (data.user) {
-        router.push("/auth/sign-up-success")
+        setUserId(data.user.id)
+        // Move to payment step
+        setStep("payment")
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
@@ -109,16 +146,142 @@ export default function SignUpPage() {
     }
   }
 
+  const handlePaymentComplete = () => {
+    setStep("success")
+    // Redirect after a short delay
+    setTimeout(() => {
+      router.push("/auth/sign-up-success")
+    }, 2000)
+  }
+
+  // Step indicator
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-8">
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+        step === "details" ? "bg-indigo-100 text-indigo-700" : "bg-green-100 text-green-700"
+      }`}>
+        {step !== "details" ? <Check className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
+        <span>Account</span>
+      </div>
+      <div className="w-8 h-px bg-slate-300" />
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+        step === "payment" ? "bg-indigo-100 text-indigo-700" : step === "success" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"
+      }`}>
+        {step === "success" ? <Check className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+        <span>Payment</span>
+      </div>
+    </div>
+  )
+
+  if (step === "success") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-600 mb-6">
+            <Check className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Payment Successful!</h1>
+          <p className="text-slate-500 mb-4">Your account is being set up. Redirecting...</p>
+          <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
+        </div>
+      </div>
+    )
+  }
+
+  if (step === "payment" && userId) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl">
+          {/* Logo */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-900">Complete Your Subscription</h1>
+            <p className="text-slate-500 mt-2">One-time setup fee + monthly subscription</p>
+          </div>
+
+          <StepIndicator />
+
+          {/* Pricing Summary */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">Order Summary</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <div>
+                  <p className="font-medium text-slate-900">Setup Fee</p>
+                  <p className="text-sm text-slate-500">One-time onboarding and configuration</p>
+                </div>
+                <p className="font-semibold text-slate-900">$949.00</p>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <div>
+                  <p className="font-medium text-slate-900">Monthly Subscription</p>
+                  <p className="text-sm text-slate-500">Full platform access, billed monthly</p>
+                </div>
+                <p className="font-semibold text-slate-900">$499.00/mo</p>
+              </div>
+              <div className="flex justify-between items-center py-2 pt-3">
+                <p className="font-semibold text-slate-900">Due Today</p>
+                <p className="text-xl font-bold text-indigo-600">$1,448.00</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Checkout */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              </div>
+            }>
+              <SignupCheckout
+                email={formData.email}
+                username={formData.username}
+                userId={userId}
+                onComplete={handlePaymentComplete}
+              />
+            </Suspense>
+          </div>
+
+          <button
+            onClick={() => setStep("details")}
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mt-4 mx-auto"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to account details
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4">
             <Calendar className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
-          <p className="text-slate-500 mt-2">Start automating your calendar today</p>
+          <p className="text-slate-500 mt-2">Start automating your sales with Thorne AI</p>
+        </div>
+
+        <StepIndicator />
+
+        {/* Pricing Preview */}
+        <div className="bg-indigo-50 rounded-xl p-4 mb-6 border border-indigo-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-indigo-900">Thorne AI Platform</p>
+              <p className="text-xs text-indigo-600">$949 setup + $499/month</p>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold text-indigo-900">$1,448</p>
+              <p className="text-xs text-indigo-600">due today</p>
+            </div>
+          </div>
         </div>
 
         {/* Sign Up Form */}
@@ -152,19 +315,22 @@ export default function SignUpPage() {
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700">
-                Email
+                Work Email
               </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="you@company.com"
                 value={formData.email}
                 onChange={handleChange}
                 className="h-11 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
                 disabled={isLoading}
                 required
               />
+              <p className="text-xs text-slate-400">
+                Business email required (no Gmail, Yahoo, etc.)
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -221,7 +387,7 @@ export default function SignUpPage() {
                   Creating account...
                 </>
               ) : (
-                "Create account"
+                "Continue to Payment"
               )}
             </Button>
           </form>
