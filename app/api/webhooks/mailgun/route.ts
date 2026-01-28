@@ -101,32 +101,33 @@ export async function POST(request: NextRequest) {
     const senderMatch = emailData.from?.match(/<([^>]+)>/) || [null, emailData.from]
     const senderEmail = senderMatch[1] || emailData.from
 
-    // Find the contact by email
+    // Find the contact by email (using tenant-based schema)
     const { data: contact } = await supabase
       .from("contacts")
-      .select("id, organization_id")
+      .select("id, tenant_id")
       .eq("email", senderEmail?.toLowerCase())
       .single()
 
-    // Store the incoming email in the database
+    // Store the incoming email in the database (using tenant-based schema)
     const { data: storedEmail, error: storeError } = await supabase
       .from("email_messages")
       .insert({
         message_id: emailData.messageId,
         contact_id: contact?.id || null,
-        organization_id: contact?.organization_id || null,
+        tenant_id: contact?.tenant_id || null,
         direction: "inbound",
-        from_address: emailData.from,
-        to_address: emailData.to,
+        from_email: emailData.from,
+        to_email: emailData.to,
         subject: emailData.subject,
         body_plain: emailData.bodyPlain,
         body_html: emailData.bodyHtml,
+        stripped_text: emailData.strippedText,
         received_at: emailData.timestamp,
         in_reply_to: emailData.inReplyTo,
-        metadata: {
+        references_header: emailData.references,
+        attachments: emailData.attachments,
+        mailgun_variables: {
           headers: emailData.headers,
-          attachments: emailData.attachments,
-          references: emailData.references,
         },
         status: "received",
       })
@@ -143,24 +144,42 @@ export async function POST(request: NextRequest) {
       await supabase
         .from("contacts")
         .update({
-          last_activity_at: new Date().toISOString(),
-          last_response_at: new Date().toISOString(),
+          last_contact_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", contact.id)
 
       // Create a conversation event
       await supabase.from("conversation_events").insert({
         contact_id: contact.id,
-        organization_id: contact.organization_id,
+        tenant_id: contact.tenant_id,
         event_type: "email_received",
-        channel: "email",
-        content: emailData.subject,
-        metadata: {
+        event_data: {
           email_id: storedEmail?.id,
           from: emailData.from,
           subject: emailData.subject,
+          preview: emailData.strippedText?.substring(0, 200),
         },
       })
+
+      // Create notification for the tenant users
+      const { data: tenantUsers } = await supabase
+        .from("tenant_users")
+        .select("user_id")
+        .eq("tenant_id", contact.tenant_id)
+
+      if (tenantUsers && tenantUsers.length > 0) {
+        const notifications = tenantUsers.map((tu) => ({
+          tenant_id: contact.tenant_id,
+          user_id: tu.user_id,
+          title: "New Email Received",
+          message: `${senderEmail} sent: ${emailData.subject || "(no subject)"}`,
+          type: "info",
+          contact_id: contact.id,
+        }))
+
+        await supabase.from("notifications").insert(notifications)
+      }
     }
 
     return NextResponse.json({
@@ -179,6 +198,6 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle GET requests (Mailgun sometimes sends verification requests)
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({ status: "ok", message: "Mailgun webhook endpoint active" })
 }
