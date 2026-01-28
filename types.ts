@@ -84,12 +84,13 @@ export interface Activity {
   id: string
   contactId?: string
   dealId?: string
-  type: ActivityType
+  type: ActivityType | string
   title: string
   detail?: string
   date: string
   oldValue?: string
   newValue?: string
+  icon?: string
 }
 
 export interface User {
