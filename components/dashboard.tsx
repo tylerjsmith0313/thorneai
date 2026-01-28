@@ -34,6 +34,7 @@ import { Scanner } from "./modals/scanner"
 import { ContactFinder } from "./modals/contact-finder"
 import { BulkUpload } from "./modals/bulk-upload"
 import { AddContactWizard } from "./modals/add-contact-wizard"
+import { AdminCenter } from "./modals/admin-center/admin-center"
 
 // Types
 import type { Contact, Deal, Conversation } from "@/types"
@@ -48,6 +49,7 @@ interface DashboardProps {
 export function Dashboard({ contacts, deals, conversations, onRefresh }: DashboardProps) {
   // Modal states
   const [showControlCenter, setShowControlCenter] = useState(false)
+  const [showAdminCenter, setShowAdminCenter] = useState(false)
   const [showIncomeBreakdown, setShowIncomeBreakdown] = useState(false)
   const [showOpportunitiesBreakdown, setShowOpportunitiesBreakdown] = useState(false)
   const [showWitheringBreakdown, setShowWitheringBreakdown] = useState(false)
@@ -83,6 +85,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
       {/* Header */}
       <DashboardHeader
         onOpenSettings={() => setShowControlCenter(true)}
+        onOpenAdminCenter={() => setShowAdminCenter(true)}
         onRadarClick={() => setShowRadar(true)}
         onScannerClick={() => setShowScanner(true)}
         onBulkClick={() => setShowBulkUpload(true)}
@@ -116,6 +119,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
 
       {/* Modals */}
       {showControlCenter && <ControlCenter onClose={() => setShowControlCenter(false)} />}
+      {showAdminCenter && <AdminCenter onClose={() => setShowAdminCenter(false)} />}
       {showIncomeBreakdown && <IncomeBreakdown deals={deals} onClose={() => setShowIncomeBreakdown(false)} />}
       {showOpportunitiesBreakdown && <OpportunitiesBreakdown deals={deals} onClose={() => setShowOpportunitiesBreakdown(false)} />}
       {showWitheringBreakdown && <WitheringBreakdown contacts={contacts} onClose={() => setShowWitheringBreakdown(false)} />}

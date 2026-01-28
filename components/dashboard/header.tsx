@@ -1,12 +1,14 @@
 "use client"
 
 import React from "react"
+import { UserCircle } from "lucide-react" // Import UserCircle
 
-import { Shield, Map, Scan, Upload, Search, Plus, Settings, UserCircle } from "lucide-react"
+import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface DashboardHeaderProps {
   onOpenSettings: () => void
+  onOpenAdminCenter: () => void
   onRadarClick?: () => void
   onScannerClick?: () => void
   onBulkClick?: () => void
@@ -16,6 +18,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ 
   onOpenSettings,
+  onOpenAdminCenter,
   onRadarClick,
   onScannerClick,
   onBulkClick,
@@ -52,7 +55,7 @@ export function DashboardHeader({
               onClick={onScannerClick} 
               color="text-emerald-500"
             />
-<ToolIconButton 
+            <ToolIconButton 
               icon={<Upload className="w-4 h-4" />} 
               label="Bulk" 
               onClick={onBulkClick} 
@@ -87,9 +90,13 @@ export function DashboardHeader({
             >
               <Settings className="w-4 h-4" />
             </button>
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0 cursor-pointer hover:bg-indigo-100 transition-all hover:shadow-md">
-              <UserCircle className="w-6 h-6" />
-            </div>
+            <button
+              onClick={onOpenAdminCenter}
+              title="Admin Center"
+              className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0 cursor-pointer hover:bg-indigo-100 transition-all hover:shadow-md"
+            >
+              <Network className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
