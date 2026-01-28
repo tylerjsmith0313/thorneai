@@ -8,12 +8,13 @@ import {
   Zap,
   Sparkles,
   Send,
-  MoreVertical,
+  EllipsisVertical,
   Mic,
   RefreshCw,
   Mail,
   Phone,
   MessageCircle,
+  MoreVertical
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -338,7 +339,7 @@ export function ConversationEngine() {
                     FLOW {flowMode ? "ON" : "OFF"}
                   </Button>
                   <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                    <MoreVertical className="w-4 h-4 text-slate-400" />
+                    <EllipsisVertical className="w-4 h-4 text-slate-400" />
                   </button>
                 </div>
               </div>

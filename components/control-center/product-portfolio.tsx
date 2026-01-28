@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ShoppingBag, Plus, MoreVertical, Loader2, Trash2 } from "lucide-react"
+import { ShoppingBag, Plus, EllipsisVertical as MoreVertical, Loader2, Trash2 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { AddProductModal } from "./add-product-modal"
 import { createClient } from "@/lib/supabase/client"
+import EllipsisVertical from "lucide-react" // Import EllipsisVertical
 
 interface Product {
   id: string
@@ -184,7 +185,7 @@ function ProductCard({ id, name, price, type, onDelete }: ProductCardProps) {
             className="p-2 text-slate-300 hover:text-slate-600 transition-colors"
             onClick={() => setShowMenu(!showMenu)}
           >
-            <MoreVertical size={20} />
+            <EllipsisVertical size={20} />
           </button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-10">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Package, Plus, MoreVertical, X, Link, Upload, List, HelpCircle, Loader2, Trash2, Save, CheckCircle } from "lucide-react"
+import { Package, Plus, X, Link, Upload, List, HelpCircle, Loader2, Trash2, Save, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
