@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Filter, Plus, MoreHorizontal, Building2, MapPin } from "lucide-react"
+import { Search, Filter, Plus, MoreHorizontal, Building2, MapPin, Upload } from "lucide-react"
 import type { Contact } from "@/types"
 import { ContactSlideout } from "@/components/modals/contact-slideout/contact-slideout"
 import { AddContactWizard } from "@/components/modals/add-contact-wizard"
+import { BulkUploadModal } from "@/components/modals/bulk-upload-modal"
 
 interface ContactsTabProps {
   contacts: Contact[]
@@ -24,6 +25,7 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
   const [search, setSearch] = useState("")
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [showAddContact, setShowAddContact] = useState(false)
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
 
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
@@ -65,6 +67,13 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
           </div>
           <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all">
             <Filter className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowBulkUpload(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Upload
           </button>
           <button
             onClick={() => setShowAddContact(true)}
@@ -150,13 +159,20 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
         />
       )}
 
-      {/* Add Contact Modal */}
+{/* Add Contact Modal */}
       {showAddContact && (
         <AddContactWizard
           onClose={() => setShowAddContact(false)}
           onComplete={() => setShowAddContact(false)}
         />
       )}
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onComplete={() => setShowBulkUpload(false)}
+      />
     </div>
   )
 }
