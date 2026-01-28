@@ -6,6 +6,7 @@ import { UserSettings } from "./control-center/user-settings"
 import { AutomationSettings } from "./control-center/automation-settings"
 import { ProductsSettings } from "./control-center/products-settings"
 import { KnowledgeSettings } from "./control-center/knowledge-settings"
+import { WorkflowSettings } from "./control-center/workflow-settings"
 import { SafeguardsSettings } from "./control-center/safeguards-settings"
 
 const navItems = [
@@ -68,7 +69,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
           {activeSection === "automation" && <AutomationSettings />}
           {activeSection === "products" && <ProductsSettings />}
           {activeSection === "knowledge" && <KnowledgeSettings />}
-          {activeSection === "workflow" && <PlaceholderSection title="Workflow Settings" description="Customize engagement sequences and triggers." />}
+          {activeSection === "workflow" && <WorkflowSettings />}
           {activeSection === "safeguards" && <SafeguardsSettings />}
         </div>
       </div>
