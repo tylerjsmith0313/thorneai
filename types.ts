@@ -1,4 +1,3 @@
-
 export type DealStatus = 'open' | 'closed-won' | 'closed-lost';
 
 export interface Deal {
