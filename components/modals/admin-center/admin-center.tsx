@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Search, Users, Shield, ChevronRight, Activity, Trash2, Network } from "lucide-react"
+import { X, Search, Users, Shield, ChevronRight, Activity, Trash2, Network, Plus, Building2, Code, Megaphone } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { createClient } from "@/lib/supabase/client"
@@ -9,11 +9,11 @@ import { createClient } from "@/lib/supabase/client"
 // Role hierarchy and icons
 const ROLES = [
   { id: "user", label: "User", icon: Users, color: "bg-slate-500" },
-  { id: "manager", label: "Manager", icon: Users, color: "bg-blue-500" },
+  { id: "manager", label: "Manager", icon: Building2, color: "bg-blue-500" },
   { id: "director", label: "Director", icon: Shield, color: "bg-violet-500" },
   { id: "vp", label: "VP", icon: Shield, color: "bg-emerald-500" },
-  { id: "it", label: "IT", icon: Network, color: "bg-cyan-500" },
-  { id: "marketing", label: "Marketing", icon: Activity, color: "bg-rose-500" },
+  { id: "it", label: "IT", icon: Code, color: "bg-cyan-500" },
+  { id: "marketing", label: "Marketing", icon: Megaphone, color: "bg-rose-500" },
 ] as const
 
 type RoleType = "admin" | "vp" | "director" | "manager" | "user" | "it" | "marketing"
@@ -143,6 +143,33 @@ export function AdminCenter({ onClose }: AdminCenterProps) {
     setSelectedMember(null)
   }
 
+  // Quick-add a new user with a specific role
+  async function quickAddUser(role: RoleType) {
+    const timestamp = Date.now()
+    const email = `user-${timestamp}@thorne.ai`
+    
+    const { data, error } = await supabase
+      .from("tenant_users")
+      .insert({
+        user_id: crypto.randomUUID(),
+        email,
+        full_name: null,
+        role,
+        features: ["dashboard"],
+      })
+      .select()
+      .single()
+
+    if (data && !error) {
+      const newMember: TeamMember = {
+        ...data,
+        features: data.features || ["dashboard"]
+      }
+      setTeamMembers(prev => [...prev, newMember])
+      setSelectedMember(newMember)
+    }
+  }
+
   // Get valid supervisors for a member based on their role
   function getValidSupervisors(member: TeamMember): TeamMember[] {
     const validRoles = VALID_REPORTS_TO[member.role]
@@ -206,24 +233,24 @@ export function AdminCenter({ onClose }: AdminCenterProps) {
             </div>
           </div>
 
-          {/* Role Filter Pills */}
-          <div className="flex items-center gap-2 mt-6">
-            {ROLES.map(role => (
-              <button
-                key={role.id}
-                onClick={() => setSelectedRole(selectedRole === role.id ? "all" : role.id as RoleType)}
-                className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-                  selectedRole === role.id
-                    ? role.id === "marketing" ? "bg-rose-500 text-white" :
-                      role.id === "it" ? "bg-cyan-500 text-white" :
-                      "bg-white text-slate-900"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-                }`}
-              >
-                <role.icon size={14} />
-                {role.label}
-              </button>
-            ))}
+          {/* Quick Add User Buttons */}
+          <div className="mt-6">
+            <div className="flex items-center gap-3 mb-3">
+              <Plus size={14} className="text-indigo-400" />
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.15em]">Add User</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {ROLES.map(role => (
+                <button
+                  key={role.id}
+                  onClick={() => quickAddUser(role.id as RoleType)}
+                  className="px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-2 bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white group"
+                >
+                  <role.icon size={14} className="group-hover:text-indigo-400 transition-colors" />
+                  {role.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
