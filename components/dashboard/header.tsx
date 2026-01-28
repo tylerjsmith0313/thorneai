@@ -1,9 +1,10 @@
 "use client"
 
 import React from "react"
+import { useRouter } from "next/navigation"
 import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { logoutAction } from "@/app/actions"
+import { createClient } from "@/lib/supabase/client"
 
 interface DashboardHeaderProps {
   onOpenSettings: () => void
@@ -24,6 +25,14 @@ export function DashboardHeader({
   onFinderClick,
   onAddContactClick
 }: DashboardHeaderProps) {
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/auth/login")
+  }
+
   return (
     <header className="bg-white border-b border-slate-100 sticky top-0 z-40 px-6 py-2.5 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -97,7 +106,7 @@ export function DashboardHeader({
               <Network className="w-5 h-5" />
             </button>
             <button
-              onClick={() => logoutAction()}
+              onClick={handleLogout}
               title="Logout"
               className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
             >
