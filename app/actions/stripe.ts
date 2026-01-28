@@ -1,8 +1,11 @@
 "use server"
 
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
 import { SUBSCRIPTION_PLANS, getPlanById } from "@/lib/subscription-products"
+import Stripe from "stripe"
+
+const stripe = getStripe()
 
 export async function createCheckoutSession(params: {
   planId: string
@@ -22,6 +25,7 @@ export async function createCheckoutSession(params: {
   }
 
   try {
+    const stripe = getStripe()
     // Create checkout session with per-seat pricing
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -69,6 +73,7 @@ export async function createCheckoutSession(params: {
 
 export async function createBillingPortalSession(customerId: string, returnUrl: string) {
   try {
+    const stripe = getStripe()
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl,
@@ -82,6 +87,7 @@ export async function createBillingPortalSession(customerId: string, returnUrl: 
 
 export async function updateSubscriptionSeats(subscriptionId: string, newSeatCount: number) {
   try {
+    const stripe = getStripe()
     const subscription = await stripe.subscriptions.retrieve(subscriptionId)
     const itemId = subscription.items.data[0]?.id
 
