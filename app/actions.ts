@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import type { Contact, Deal, ContactStatus } from "@/types"
 
+// Valid UUID for preview/anonymous users (used when auth is disabled)
+const PREVIEW_USER_ID = "00000000-0000-0000-0000-000000000000"
+
 // CONTACT ACTIONS
 export async function createContactAction(formData: {
   firstName: string
@@ -26,7 +29,7 @@ export async function createContactAction(formData: {
   
   // Try to get user, but allow unauthenticated access for preview
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || PREVIEW_USER_ID
 
   // Combine address fields into a single address string for database
   const addressParts = [
@@ -143,7 +146,7 @@ export async function createDealAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || "PREVIEW_USER_ID"
 
   const { data, error } = await supabase
     .from("deals")
@@ -204,7 +207,7 @@ export async function updateDealStatusAction(
 
   // Log activity
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || "PREVIEW_USER_ID"
   await supabase.from("activities").insert({
     user_id: userId,
     deal_id: id,
@@ -225,7 +228,7 @@ export async function createConversationAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || "PREVIEW_USER_ID"
 
   const { data, error } = await supabase
     .from("conversations")
@@ -312,7 +315,7 @@ export async function createProductAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || "PREVIEW_USER_ID"
 
   const { data, error } = await supabase
     .from("products")
@@ -352,7 +355,7 @@ export async function bulkImportContactsAction(
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "preview-user"
+  const userId = user?.id || "PREVIEW_USER_ID"
 
   const contactsToInsert = contacts.map((c) => ({
     user_id: userId,
