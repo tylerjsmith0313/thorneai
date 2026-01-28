@@ -2,8 +2,8 @@
 
 import React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -13,13 +13,21 @@ import { Calendar, Loader2, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionTimeout, setSessionTimeout] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'session_timeout') {
+      setSessionTimeout(true)
+    }
+  }, [searchParams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -72,6 +80,12 @@ export default function LoginPage() {
         {/* Login Form */}
         <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
           <form onSubmit={handleLogin} className="space-y-5">
+            {sessionTimeout && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                Your session has expired due to inactivity. Please sign in again.
+              </div>
+            )}
+
             {error && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
                 {error}
