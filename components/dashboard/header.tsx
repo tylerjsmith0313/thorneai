@@ -1,10 +1,9 @@
 "use client"
 
 import React from "react"
-import { UserCircle } from "lucide-react" // Import UserCircle
-
-import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network } from "lucide-react"
+import { Shield, Map, Scan, Upload, Search, Plus, Settings, Network, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { logoutAction } from "@/app/actions"
 
 interface DashboardHeaderProps {
   onOpenSettings: () => void
@@ -96,6 +95,13 @@ export function DashboardHeader({
               className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0 cursor-pointer hover:bg-indigo-100 transition-all hover:shadow-md"
             >
               <Network className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => logoutAction()}
+              title="Logout"
+              className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

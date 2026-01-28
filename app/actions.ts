@@ -2,7 +2,15 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import type { Contact, Deal, ContactStatus } from "@/types"
+
+// AUTH ACTIONS
+export async function logoutAction() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect("/auth/login")
+}
 
 // CONTACT ACTIONS
 export async function createContactAction(formData: {
