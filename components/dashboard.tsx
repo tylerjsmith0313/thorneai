@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { MessageSquare } from "lucide-react"
+
+// Dashboard components
 import { DashboardHeader } from "./dashboard/header"
 import { NeuralFeed } from "./dashboard/neural-feed"
 import { ContentTabs } from "./dashboard/content-tabs"
@@ -34,10 +37,11 @@ import { AddContactWizard } from "./modals/add-contact-wizard"
 // Data
 import { mockDeals, mockContacts, mockConversations } from "@/lib/mock-data"
 
-// Icons for conversation card
-import { MessageSquare } from "lucide-react"
+// Types
+import type { Conversation } from "@/types.ts"
 
 export function Dashboard() {
+  // Modal states
   const [showControlCenter, setShowControlCenter] = useState(false)
   const [showIncomeBreakdown, setShowIncomeBreakdown] = useState(false)
   const [showOpportunitiesBreakdown, setShowOpportunitiesBreakdown] = useState(false)
@@ -46,11 +50,11 @@ export function Dashboard() {
   const [showBreakUpsBreakdown, setShowBreakUpsBreakdown] = useState(false)
   const [showContactsBreakdown, setShowContactsBreakdown] = useState(false)
   const [showDatabaseBreakdown, setShowDatabaseBreakdown] = useState(false)
+  const [showConversationsBreakdown, setShowConversationsBreakdown] = useState(false)
   const [showRadar, setShowRadar] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [showFinder, setShowFinder] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
-  const [showConversationsBreakdown, setShowConversationsBreakdown] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
 
   const handleVerifyLead = (lead: unknown) => {
@@ -65,6 +69,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Header */}
       <DashboardHeader
         onOpenSettings={() => setShowControlCenter(true)}
         onRadarClick={() => setShowRadar(true)}
@@ -74,11 +79,12 @@ export function Dashboard() {
         onAddContactClick={() => setShowAddContact(true)}
       />
 
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         <NeuralFeed />
 
         {/* Primary Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <IncomeCard deals={mockDeals} onClick={() => setShowIncomeBreakdown(true)} />
           <OpportunitiesCard deals={mockDeals} onClick={() => setShowOpportunitiesBreakdown(true)} />
           <ContactsAddedCard contacts={mockContacts} onClick={() => setShowContactsBreakdown(true)} />
@@ -86,77 +92,46 @@ export function Dashboard() {
         </div>
 
         {/* Secondary Status Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <WitheringCard contacts={mockContacts} onClick={() => setShowWitheringBreakdown(true)} />
           <BreakUpsCard contacts={mockContacts} onClick={() => setShowBreakUpsBreakdown(true)} />
           <DeadDealsCard deals={mockDeals} onClick={() => setShowDeadDealsBreakdown(true)} />
           <DatabaseCard contacts={mockContacts} onClick={() => setShowDatabaseBreakdown(true)} />
         </div>
 
+        {/* Content Tabs */}
         <ContentTabs />
       </main>
 
       {/* Modals */}
       {showControlCenter && <ControlCenter onClose={() => setShowControlCenter(false)} />}
-
       {showIncomeBreakdown && <IncomeBreakdown deals={mockDeals} onClose={() => setShowIncomeBreakdown(false)} />}
-
-      {showWitheringBreakdown && (
-        <WitheringBreakdown contacts={mockContacts} onClose={() => setShowWitheringBreakdown(false)} />
-      )}
-
-      {showBreakUpsBreakdown && (
-        <BreakUpsBreakdown contacts={mockContacts} onClose={() => setShowBreakUpsBreakdown(false)} />
-      )}
-
-      {showContactsBreakdown && (
-        <ContactsAddedBreakdown contacts={mockContacts} onClose={() => setShowContactsBreakdown(false)} />
-      )}
-
-      {showDatabaseBreakdown && (
-        <DatabaseBreakdown contacts={mockContacts} onClose={() => setShowDatabaseBreakdown(false)} />
-      )}
-
-      {showDeadDealsBreakdown && (
-        <DeadDealsBreakdown deals={mockDeals} onClose={() => setShowDeadDealsBreakdown(false)} />
-      )}
-
+      {showWitheringBreakdown && <WitheringBreakdown contacts={mockContacts} onClose={() => setShowWitheringBreakdown(false)} />}
+      {showBreakUpsBreakdown && <BreakUpsBreakdown contacts={mockContacts} onClose={() => setShowBreakUpsBreakdown(false)} />}
+      {showContactsBreakdown && <ContactsAddedBreakdown contacts={mockContacts} onClose={() => setShowContactsBreakdown(false)} />}
+      {showDatabaseBreakdown && <DatabaseBreakdown contacts={mockContacts} onClose={() => setShowDatabaseBreakdown(false)} />}
+      {showDeadDealsBreakdown && <DeadDealsBreakdown deals={mockDeals} onClose={() => setShowDeadDealsBreakdown(false)} />}
+      {showConversationsBreakdown && <ActiveConversationsBreakdown conversations={mockConversations} onClose={() => setShowConversationsBreakdown(false)} />}
       {showRadar && <RadarScan onClose={() => setShowRadar(false)} />}
-
       {showScanner && <Scanner onClose={() => setShowScanner(false)} />}
-
       {showFinder && <ContactFinder onClose={() => setShowFinder(false)} onVerify={handleVerifyLead} />}
-
       {showBulkUpload && <BulkUpload onClose={() => setShowBulkUpload(false)} onIngest={handleBulkIngest} />}
-
-      {showConversationsBreakdown && (
-        <ActiveConversationsBreakdown conversations={mockConversations} onClose={() => setShowConversationsBreakdown(false)} />
-      )}
-
       {showAddContact && <AddContactWizard onClose={() => setShowAddContact(false)} />}
     </div>
   )
 }
 
-// Conversations card component
-interface Conversation {
-  id: string
-  contactId: string
-  contactName: string
-  lastMessage: string
-  lastActive: string
-  status: string
-  channel: string
-  unreadCount: number
-}
-
+// Conversations Card Component
 function ConversationsCard({ conversations, onClick }: { conversations: Conversation[]; onClick: () => void }) {
   const ongoingCount = conversations.length
   const managedCount = conversations.filter((c) => c.status === "thorne_handling").length
   const actionCount = conversations.filter((c) => c.unreadCount > 0).length
 
   return (
-    <div onClick={onClick} className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 cursor-pointer hover:shadow-lg hover:border-indigo-100 transition-all group overflow-hidden relative h-full flex flex-col justify-between">
+    <div
+      onClick={onClick}
+      className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 cursor-pointer hover:shadow-lg hover:border-indigo-100 transition-all group overflow-hidden relative h-full flex flex-col justify-between"
+    >
       <div className="flex items-start justify-between mb-2.5">
         <div className="p-2 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition-colors border border-indigo-50">
           <MessageSquare className="w-4 h-4 text-indigo-600" />
