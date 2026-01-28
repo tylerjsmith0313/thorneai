@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { AICommandChat } from "./ai-command-chat"
+import { DevelopmentSection } from "./development-section"
 
 const tabs = [
   "AI COMMAND",
@@ -40,7 +41,8 @@ export function ContentTabs() {
       {/* Tab Content */}
       <div className="p-4">
         {activeTab === "AI COMMAND" && <AICommandChat />}
-        {activeTab !== "AI COMMAND" && (
+        {activeTab === "ACADEMY" && <DevelopmentSection />}
+        {activeTab !== "AI COMMAND" && activeTab !== "ACADEMY" && (
           <div className="text-center py-12 text-muted-foreground">
             <p className="text-sm">{activeTab} content coming soon...</p>
           </div>

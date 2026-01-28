@@ -22,12 +22,14 @@ import { BreakUpsBreakdown } from "./breakdowns/break-ups-breakdown"
 import { ContactsAddedBreakdown } from "./breakdowns/contacts-added-breakdown"
 import { DatabaseBreakdown } from "./breakdowns/database-breakdown"
 import { DeadDealsBreakdown } from "./breakdowns/dead-deals-breakdown"
+import { ActiveConversationsBreakdown } from "./breakdowns/active-conversations-breakdown"
 
 // Modals
 import { RadarScan } from "./modals/radar-scan"
 import { Scanner } from "./modals/scanner"
 import { ContactFinder } from "./modals/contact-finder"
 import { BulkUpload } from "./modals/bulk-upload"
+import { AddContactWizard } from "./modals/add-contact-wizard"
 
 // Data
 import { mockDeals, mockContacts, mockConversations } from "@/lib/mock-data"
@@ -48,6 +50,8 @@ export function Dashboard() {
   const [showScanner, setShowScanner] = useState(false)
   const [showFinder, setShowFinder] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showConversationsBreakdown, setShowConversationsBreakdown] = useState(false)
+  const [showAddContact, setShowAddContact] = useState(false)
 
   const handleVerifyLead = (lead: unknown) => {
     console.log("[v0] Lead verified:", lead)
@@ -67,6 +71,7 @@ export function Dashboard() {
         onScannerClick={() => setShowScanner(true)}
         onBulkClick={() => setShowBulkUpload(true)}
         onFinderClick={() => setShowFinder(true)}
+        onAddContactClick={() => setShowAddContact(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
@@ -77,7 +82,7 @@ export function Dashboard() {
           <IncomeCard deals={mockDeals} onClick={() => setShowIncomeBreakdown(true)} />
           <OpportunitiesCard deals={mockDeals} onClick={() => setShowOpportunitiesBreakdown(true)} />
           <ContactsAddedCard contacts={mockContacts} onClick={() => setShowContactsBreakdown(true)} />
-          <ConversationsCard conversations={mockConversations} />
+          <ConversationsCard conversations={mockConversations} onClick={() => setShowConversationsBreakdown(true)} />
         </div>
 
         {/* Secondary Status Row */}
@@ -123,6 +128,12 @@ export function Dashboard() {
       {showFinder && <ContactFinder onClose={() => setShowFinder(false)} onVerify={handleVerifyLead} />}
 
       {showBulkUpload && <BulkUpload onClose={() => setShowBulkUpload(false)} onIngest={handleBulkIngest} />}
+
+      {showConversationsBreakdown && (
+        <ActiveConversationsBreakdown conversations={mockConversations} onClose={() => setShowConversationsBreakdown(false)} />
+      )}
+
+      {showAddContact && <AddContactWizard onClose={() => setShowAddContact(false)} />}
     </div>
   )
 }
@@ -139,13 +150,13 @@ interface Conversation {
   unreadCount: number
 }
 
-function ConversationsCard({ conversations }: { conversations: Conversation[] }) {
+function ConversationsCard({ conversations, onClick }: { conversations: Conversation[]; onClick: () => void }) {
   const ongoingCount = conversations.length
   const managedCount = conversations.filter((c) => c.status === "thorne_handling").length
   const actionCount = conversations.filter((c) => c.unreadCount > 0).length
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 cursor-pointer hover:shadow-lg hover:border-indigo-100 transition-all group overflow-hidden relative h-full flex flex-col justify-between">
+    <div onClick={onClick} className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 cursor-pointer hover:shadow-lg hover:border-indigo-100 transition-all group overflow-hidden relative h-full flex flex-col justify-between">
       <div className="flex items-start justify-between mb-2.5">
         <div className="p-2 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition-colors border border-indigo-50">
           <MessageSquare className="w-4 h-4 text-indigo-600" />
