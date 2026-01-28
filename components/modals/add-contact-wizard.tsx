@@ -53,15 +53,31 @@ export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) 
 
   const updateData = (updates: Partial<WizardFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
+    setError(null)
   }
 
-  const isValid = formData.firstName.trim() && formData.lastName.trim() && formData.email.trim()
+  // Email format validation (no external verification required)
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email.trim())
+  }
+
+  const emailFormatValid = isValidEmail(formData.email)
+  const isValid = formData.firstName.trim() && formData.lastName.trim() && formData.email.trim() && emailFormatValid
 
   const hasAddress = formData.streetAddress.trim() || formData.city.trim()
 
   const handleSubmit = () => {
-    if (!isValid) {
-      setError("Please fill in required fields (First Name, Last Name, Email)")
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      setError("Please fill in First Name and Last Name")
+      return
+    }
+    if (!formData.email.trim()) {
+      setError("Please enter an email address")
+      return
+    }
+    if (!emailFormatValid) {
+      setError("Please enter a valid email address (e.g., john@company.com)")
       return
     }
 
@@ -143,14 +159,26 @@ export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) 
               />
             </div>
 
-            <BaseInput
-              label="Email Address *"
-              type="email"
-              placeholder="john@company.com"
-              value={formData.email}
-              onChange={e => updateData({ email: e.target.value })}
-              icon={<Mail size={16} />}
-            />
+            <div className="space-y-1">
+              <BaseInput
+                label="Email Address *"
+                type="email"
+                placeholder="john@company.com"
+                value={formData.email}
+                onChange={e => updateData({ email: e.target.value })}
+                icon={<Mail size={16} />}
+              />
+              {formData.email && !emailFormatValid && (
+                <p className="text-[11px] text-amber-600 ml-1">
+                  Please enter a valid email format
+                </p>
+              )}
+              {formData.email && emailFormatValid && (
+                <p className="text-[11px] text-emerald-600 ml-1">
+                  Valid email format
+                </p>
+              )}
+            </div>
 
             <BaseInput
               label="Phone Number"
