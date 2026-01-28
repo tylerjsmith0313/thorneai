@@ -20,6 +20,7 @@ import { DatabaseCard } from "./cards/database-card"
 
 // Breakdowns
 import { IncomeBreakdown } from "./breakdowns/income-breakdown"
+import { OpportunitiesBreakdown } from "./breakdowns/opportunities-breakdown"
 import { WitheringBreakdown } from "./breakdowns/withering-breakdown"
 import { BreakUpsBreakdown } from "./breakdowns/break-ups-breakdown"
 import { ContactsAddedBreakdown } from "./breakdowns/contacts-added-breakdown"
@@ -116,6 +117,7 @@ export function Dashboard({ contacts, deals, conversations, onRefresh }: Dashboa
       {/* Modals */}
       {showControlCenter && <ControlCenter onClose={() => setShowControlCenter(false)} />}
       {showIncomeBreakdown && <IncomeBreakdown deals={deals} onClose={() => setShowIncomeBreakdown(false)} />}
+      {showOpportunitiesBreakdown && <OpportunitiesBreakdown deals={deals} onClose={() => setShowOpportunitiesBreakdown(false)} />}
       {showWitheringBreakdown && <WitheringBreakdown contacts={contacts} onClose={() => setShowWitheringBreakdown(false)} />}
       {showBreakUpsBreakdown && <BreakUpsBreakdown contacts={contacts} onClose={() => setShowBreakUpsBreakdown(false)} />}
       {showContactsBreakdown && <ContactsAddedBreakdown contacts={contacts} onClose={() => setShowContactsBreakdown(false)} />}
