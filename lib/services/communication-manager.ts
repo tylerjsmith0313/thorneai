@@ -32,42 +32,56 @@ let userPreferences = {
 }
 
 /**
- * Fetches Mailgun credentials for the current user's tenant
+ * Fetches Mailgun credentials - checks user_integrations first, then falls back to env vars
  */
 async function getMailgunConfig(): Promise<MailgunConfig | null> {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  if (!user) {
+    // Fall back to environment variables if no user
+    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN && process.env.MAILGUN_FROM_EMAIL) {
+      return {
+        apiKey: process.env.MAILGUN_API_KEY,
+        domain: process.env.MAILGUN_DOMAIN,
+        fromEmail: process.env.MAILGUN_FROM_EMAIL,
+        enabled: true
+      }
+    }
+    return null
+  }
 
-  // Get user's tenant
-  const { data: tenantUser } = await supabase
-    .from("tenant_users")
-    .select("tenant_id")
+  // Check user-specific integrations first
+  const { data: userIntegrations } = await supabase
+    .from("user_integrations")
+    .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled")
     .eq("user_id", user.id)
     .single()
 
-  if (!tenantUser?.tenant_id) return null
-
-  // Get tenant integrations
-  const { data: integrations } = await supabase
-    .from("tenant_integrations")
-    .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled")
-    .eq("tenant_id", tenantUser.tenant_id)
-    .single()
-
-  if (!integrations || !integrations.mailgun_enabled) return null
-
-  return {
-    apiKey: integrations.mailgun_api_key,
-    domain: integrations.mailgun_domain,
-    fromEmail: integrations.mailgun_from_email,
-    enabled: integrations.mailgun_enabled
+  if (userIntegrations?.mailgun_enabled && userIntegrations?.mailgun_api_key) {
+    return {
+      apiKey: userIntegrations.mailgun_api_key,
+      domain: userIntegrations.mailgun_domain,
+      fromEmail: userIntegrations.mailgun_from_email,
+      enabled: userIntegrations.mailgun_enabled
+    }
   }
+
+  // Fall back to environment variables
+  if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN && process.env.MAILGUN_FROM_EMAIL) {
+    return {
+      apiKey: process.env.MAILGUN_API_KEY,
+      domain: process.env.MAILGUN_DOMAIN,
+      fromEmail: process.env.MAILGUN_FROM_EMAIL,
+      enabled: true
+    }
+  }
+
+  return null
 }
 
 /**
- * Sends email via Mailgun using tenant-specific credentials
+ * Sends email via Mailgun
  */
 async function sendViaMailgun(
   config: MailgunConfig,
@@ -119,7 +133,6 @@ export const communicationManager = {
    */
   updateBookingLink(newLink: string) {
     userPreferences.bookingLink = newLink
-    console.log(`[Thorne Logic]: Booking node updated to ${newLink}`)
   },
 
   getBookingLink() {
@@ -127,7 +140,7 @@ export const communicationManager = {
   },
 
   /**
-   * Checks if Mailgun is configured and enabled for the current tenant
+   * Checks if Mailgun is configured and enabled
    */
   async isMailgunEnabled(): Promise<boolean> {
     const config = await getMailgunConfig()
@@ -199,6 +212,21 @@ export const communicationManager = {
         channel: "Email",
         unread_count: 0,
         messages: [newMessage],
+      })
+    }
+
+    // Also log to contact_communications table
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from("contact_communications").insert({
+        contact_id: contact.id,
+        user_id: user.id,
+        channel: "email",
+        direction: "outbound",
+        subject: subject,
+        content: text,
+        status: emailSent ? "sent" : "pending",
+        metadata: mailgunMessageId ? { mailgun_id: mailgunMessageId } : {}
       })
     }
 
