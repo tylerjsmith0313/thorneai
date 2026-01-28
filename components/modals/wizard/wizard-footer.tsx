@@ -9,18 +9,28 @@ interface WizardFooterProps {
   isPending?: boolean
   onBack: () => void
   onNext: () => void
+  nextLabel?: string
+  backLabel?: string
 }
 
-export function WizardFooter({ isFirstStep, isLastStep, isPending, onBack, onNext }: WizardFooterProps) {
+export function WizardFooter({ 
+  isFirstStep, 
+  isLastStep, 
+  isPending, 
+  onBack, 
+  onNext,
+  nextLabel,
+  backLabel 
+}: WizardFooterProps) {
   return (
     <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
       <BaseButton 
         variant="ghost" 
         onClick={onBack} 
-        disabled={isFirstStep || isPending}
-        icon={<ChevronLeft size={18} />}
+        disabled={isPending}
+        icon={!isFirstStep ? <ChevronLeft size={18} /> : undefined}
       >
-        Back
+        {backLabel || (isFirstStep ? "Cancel" : "Back")}
       </BaseButton>
       <BaseButton 
         variant={isLastStep ? "primary" : "dark"} 
@@ -34,6 +44,8 @@ export function WizardFooter({ isFirstStep, isLastStep, isPending, onBack, onNex
             <Loader2 size={18} className="animate-spin mr-2" />
             Processing...
           </>
+        ) : nextLabel ? (
+          nextLabel
         ) : isLastStep ? (
           "Finish & Launch"
         ) : (

@@ -4,169 +4,74 @@ import { useState, useTransition } from "react"
 import { createContactAction } from "@/app/actions"
 import { WizardHeader } from "./wizard/wizard-header"
 import { WizardFooter } from "./wizard/wizard-footer"
-import { ContactDetailsStep } from "./wizard/contact-details-step"
-import { SocialMediaStep } from "./wizard/social-media-step"
-import { CompanyInfoStep } from "./wizard/company-info-step"
-import { OutreachStep } from "./wizard/outreach-step"
-import { StrategyStep } from "./wizard/strategy-step"
-import { FinalizeStep } from "./wizard/finalize-step"
+import { BaseInput } from "@/components/ui/base-input"
+import { User, Mail, Phone, Building2, Briefcase, Globe } from "lucide-react"
 
 interface AddContactWizardProps {
   onClose: () => void
   onSuccess?: () => void
-  initialData?: Partial<WizardFormData>
 }
-
-export type WizardStep = "details" | "social" | "company" | "outreach" | "strategy" | "finalize"
 
 export interface WizardFormData {
   firstName: string
   lastName: string
-  pEmail: string
-  wEmail: string
+  email: string
   phone: string
   company: string
-  companyUrl: string
   jobTitle: string
-  employees: string
-  locations: string
-  channels: string[]
-  budget: number
-  mode: "manual" | "flow"
   source: string
 }
-
-const steps: { id: WizardStep; label: string }[] = [
-  { id: "details", label: "Contact Details" },
-  { id: "social", label: "Social Media" },
-  { id: "company", label: "Company Info" },
-  { id: "outreach", label: "Outreach Channels" },
-  { id: "strategy", label: "AI Strategy" },
-  { id: "finalize", label: "Finalize" }
-]
 
 const defaultFormData: WizardFormData = {
   firstName: "",
   lastName: "",
-  pEmail: "",
-  wEmail: "",
+  email: "",
   phone: "",
   company: "",
-  companyUrl: "",
   jobTitle: "",
-  employees: "",
-  locations: "",
-  channels: ["Email", "LinkedIn"],
-  budget: 100,
-  mode: "manual",
   source: "manual"
 }
 
-export function AddContactWizard({ onClose, onSuccess, initialData }: AddContactWizardProps) {
-  const [step, setStep] = useState<WizardStep>("details")
+export function AddContactWizard({ onClose, onSuccess }: AddContactWizardProps) {
   const [isPending, startTransition] = useTransition()
-  const [loading, setLoading] = useState(false)
-  const [campaignIdeas, setCampaignIdeas] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
-  
-  const [formData, setFormData] = useState<WizardFormData>({
-    ...defaultFormData,
-    ...initialData
-  })
-
-  const currentStepIndex = steps.findIndex(s => s.id === step)
-  const isFirstStep = currentStepIndex === 0
-  const isLastStep = currentStepIndex === steps.length - 1
+  const [formData, setFormData] = useState<WizardFormData>(defaultFormData)
 
   const updateData = (updates: Partial<WizardFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
   }
 
-  const generateStrategy = async () => {
-    setLoading(true)
-    // Simulate AI strategy generation
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setCampaignIdeas(`Based on ${formData.firstName} ${formData.lastName}'s profile at ${formData.company || "their company"}, here's your recommended outreach strategy:
+  const isValid = formData.firstName.trim() && formData.lastName.trim() && formData.email.trim()
 
-1. **Initial Contact via ${formData.channels[0] || "Email"}**
-   Start with a personalized message highlighting mutual connections or shared interests.
+  const handleSubmit = () => {
+    if (!isValid) {
+      setError("Please fill in required fields (First Name, Last Name, Email)")
+      return
+    }
 
-2. **Value-First Approach**
-   Share relevant industry insights or case studies before pitching.
-
-3. **Multi-Touch Sequence**
-   Plan ${formData.channels.length} touchpoints across ${formData.channels.join(", ")} over 3 weeks.
-
-4. **Budget Allocation**
-   With your $${formData.budget} budget, consider a thoughtful gift after the third touchpoint.
-
-5. **Timing Optimization**
-   Best outreach windows: Tuesday-Thursday, 9-11 AM local time.`)
-    setLoading(false)
-  }
-
-  const handleNext = async () => {
-    if (isLastStep) {
-      // Submit the form
-      startTransition(async () => {
-        try {
-          const result = await createContactAction({
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.wEmail || formData.pEmail,
-            phone: formData.phone,
-            company: formData.company,
-            jobTitle: formData.jobTitle,
-            source: formData.source,
-            status: "New"
-          })
-          
-          if (result.success) {
-            onSuccess?.()
-            onClose()
-          } else {
-            setError(result.error || "Failed to create contact")
-          }
-        } catch (err) {
-          setError("An unexpected error occurred")
+    startTransition(async () => {
+      try {
+        const result = await createContactAction({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          jobTitle: formData.jobTitle,
+          source: formData.source,
+          status: "New"
+        })
+        
+        if (result.success) {
+          onSuccess?.()
+          onClose()
+        } else {
+          setError(result.error || "Failed to create contact")
         }
-      })
-    } else {
-      const nextIndex = currentStepIndex + 1
-      const nextStep = steps[nextIndex].id
-      setStep(nextStep)
-      
-      // Generate strategy when moving to strategy step
-      if (nextStep === "strategy" && !campaignIdeas) {
-        generateStrategy()
+      } catch (err) {
+        setError("An unexpected error occurred")
       }
-    }
-  }
-
-  const handleBack = () => {
-    if (!isFirstStep) {
-      const prevIndex = currentStepIndex - 1
-      setStep(steps[prevIndex].id)
-    }
-  }
-
-  const renderStep = () => {
-    switch (step) {
-      case "details":
-        return <ContactDetailsStep data={formData} updateData={updateData} />
-      case "social":
-        return <SocialMediaStep />
-      case "company":
-        return <CompanyInfoStep data={formData} updateData={updateData} />
-      case "outreach":
-        return <OutreachStep data={formData} updateData={updateData} />
-      case "strategy":
-        return <StrategyStep loading={loading} campaignIdeas={campaignIdeas} />
-      case "finalize":
-        return <FinalizeStep data={formData} updateData={updateData} />
-      default:
-        return null
-    }
+    })
   }
 
   return (
@@ -178,61 +83,106 @@ export function AddContactWizard({ onClose, onSuccess, initialData }: AddContact
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-[48px] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+      <div className="relative bg-white rounded-[48px] shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
         <WizardHeader
-          stepNumber={currentStepIndex + 1}
-          totalSteps={steps.length}
-          stepLabel={steps[currentStepIndex].label}
+          stepNumber={1}
+          totalSteps={1}
+          stepLabel="Add New Contact"
           onClose={onClose}
         />
 
-        {/* Progress Bar */}
-        <div className="px-8 py-4 bg-slate-50/50 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            {steps.map((s, index) => (
-              <div key={s.id} className="flex items-center flex-1">
-                <div 
-                  className={`h-1.5 flex-1 rounded-full transition-all ${
-                    index <= currentStepIndex 
-                      ? "bg-indigo-600" 
-                      : "bg-slate-200"
-                  }`}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-2">
-            {steps.map((s, index) => (
-              <span 
-                key={s.id}
-                className={`text-[9px] font-bold uppercase tracking-widest ${
-                  index <= currentStepIndex 
-                    ? "text-indigo-600" 
-                    : "text-slate-300"
-                }`}
-              >
-                {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm">
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm">
               {error}
             </div>
           )}
-          {renderStep()}
+
+          <p className="text-sm text-slate-500">
+            Add basic contact info now. You can configure outreach channels and AI strategy from their profile later.
+          </p>
+
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <BaseInput
+                label="First Name *"
+                placeholder="John"
+                value={formData.firstName}
+                onChange={e => updateData({ firstName: e.target.value })}
+                icon={<User size={16} />}
+              />
+              <BaseInput
+                label="Last Name *"
+                placeholder="Doe"
+                value={formData.lastName}
+                onChange={e => updateData({ lastName: e.target.value })}
+                icon={<User size={16} />}
+              />
+            </div>
+
+            <BaseInput
+              label="Email Address *"
+              type="email"
+              placeholder="john@company.com"
+              value={formData.email}
+              onChange={e => updateData({ email: e.target.value })}
+              icon={<Mail size={16} />}
+            />
+
+            <BaseInput
+              label="Phone Number"
+              type="tel"
+              placeholder="+1 (555) 123-4567"
+              value={formData.phone}
+              onChange={e => updateData({ phone: e.target.value })}
+              icon={<Phone size={16} />}
+            />
+
+            <BaseInput
+              label="Company"
+              placeholder="Acme Corp"
+              value={formData.company}
+              onChange={e => updateData({ company: e.target.value })}
+              icon={<Building2 size={16} />}
+            />
+
+            <BaseInput
+              label="Job Title"
+              placeholder="VP of Sales"
+              value={formData.jobTitle}
+              onChange={e => updateData({ jobTitle: e.target.value })}
+              icon={<Briefcase size={16} />}
+            />
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                Source
+              </label>
+              <select
+                value={formData.source}
+                onChange={e => updateData({ source: e.target.value })}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+              >
+                <option value="manual">Manual Entry</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="referral">Referral</option>
+                <option value="conference">Conference</option>
+                <option value="website">Website</option>
+                <option value="cold_outreach">Cold Outreach</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <WizardFooter
-          isFirstStep={isFirstStep}
-          isLastStep={isLastStep}
+          isFirstStep={true}
+          isLastStep={true}
           isPending={isPending}
-          onBack={handleBack}
-          onNext={handleNext}
+          onBack={onClose}
+          onNext={handleSubmit}
+          nextLabel="Add Contact"
+          backLabel="Cancel"
         />
       </div>
     </div>
