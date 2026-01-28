@@ -1,22 +1,121 @@
 "use client"
 
-import { useState } from "react"
-import { Shield, Zap, DollarSign } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Shield, Zap, DollarSign, Save, Loader2, CheckCircle } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
+import { createClient } from "@/lib/supabase/client"
 
 export function SafeguardsSettings() {
-  const [dncEnabled, setDncEnabled] = useState(true)
-  const [automationMode, setAutomationMode] = useState<"user" | "auto">("user")
-  const [maxGiftValue, setMaxGiftValue] = useState([50])
-  const [monthlyBurnLimit, setMonthlyBurnLimit] = useState([1000])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  
+  const [settings, setSettings] = useState({
+    dnc_enabled: true,
+    automation_mode: "user" as "user" | "auto",
+    max_gift_value: 50,
+    monthly_burn_limit: 1000,
+  })
+
+  // Load settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      const supabase = createClient()
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+      
+      setUserId(user.id)
+      
+      // Get user settings
+      const { data: userSettings } = await supabase
+        .from("user_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+      
+      if (userSettings) {
+        setSettings({
+          dnc_enabled: userSettings.dnc_enabled ?? true,
+          automation_mode: (userSettings.automation_mode as "user" | "auto") || "user",
+          max_gift_value: userSettings.max_gift_value ?? 50,
+          monthly_burn_limit: userSettings.monthly_burn_limit ?? 1000,
+        })
+      }
+      
+      setIsLoading(false)
+    }
+    
+    loadSettings()
+  }, [])
+
+  const handleSave = async () => {
+    if (!userId) return
+    
+    setIsSaving(true)
+    setSaveSuccess(false)
+    
+    const supabase = createClient()
+    
+    // Upsert user settings
+    const { error } = await supabase
+      .from("user_settings")
+      .upsert({
+        user_id: userId,
+        dnc_enabled: settings.dnc_enabled,
+        automation_mode: settings.automation_mode,
+        max_gift_value: settings.max_gift_value,
+        monthly_burn_limit: settings.monthly_burn_limit,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" })
+    
+    if (error) {
+      console.error("[v0] Error saving safeguards settings:", error)
+    } else {
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    }
+    
+    setIsSaving(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+      </div>
+    )
+  }
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-foreground mb-2">Compliance & Safeguards</h2>
-      <p className="text-muted-foreground mb-8">
-        Set boundaries and approval requirements for automated actions.
-      </p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Compliance & Safeguards</h2>
+          <p className="text-muted-foreground">
+            Set boundaries and approval requirements for automated actions.
+          </p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50"
+        >
+          {isSaving ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : saveSuccess ? (
+            <CheckCircle size={16} />
+          ) : (
+            <Save size={16} />
+          )}
+          {saveSuccess ? "Saved!" : "Save Changes"}
+        </button>
+      </div>
 
       {/* DNC Registry Toggle */}
       <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4 mb-6">
@@ -29,7 +128,13 @@ export function SafeguardsSettings() {
             Automatically check Do Not Call lists before any voice AI outreach.
           </p>
         </div>
-        <Switch checked={dncEnabled} onCheckedChange={setDncEnabled} />
+        <Switch 
+          checked={settings.dnc_enabled} 
+          onCheckedChange={(checked) => {
+            setSettings(prev => ({ ...prev, dnc_enabled: checked }))
+            setSaveSuccess(false)
+          }} 
+        />
       </div>
 
       <div className="flex gap-4">
@@ -43,9 +148,12 @@ export function SafeguardsSettings() {
           </div>
           <div className="space-y-2">
             <button
-              onClick={() => setAutomationMode("user")}
+              onClick={() => {
+                setSettings(prev => ({ ...prev, automation_mode: "user" }))
+                setSaveSuccess(false)
+              }}
               className={`w-full py-3 px-4 rounded-lg text-sm font-medium transition-colors ${
-                automationMode === "user"
+                settings.automation_mode === "user"
                   ? "bg-white border-2 border-thorne-indigo text-thorne-indigo"
                   : "bg-white/50 border border-border text-foreground hover:bg-white"
               }`}
@@ -53,9 +161,12 @@ export function SafeguardsSettings() {
               User Controlled
             </button>
             <button
-              onClick={() => setAutomationMode("auto")}
+              onClick={() => {
+                setSettings(prev => ({ ...prev, automation_mode: "auto" }))
+                setSaveSuccess(false)
+              }}
               className={`w-full py-3 px-4 rounded-lg text-sm font-medium transition-colors ${
-                automationMode === "auto"
+                settings.automation_mode === "auto"
                   ? "bg-thorne-indigo text-white"
                   : "bg-thorne-indigo/80 text-white hover:bg-thorne-indigo"
               }`}
@@ -81,12 +192,15 @@ export function SafeguardsSettings() {
                   MAX PER-GIFT VALUE
                 </span>
                 <span className="text-thorne-lavender font-semibold">
-                  ${maxGiftValue[0].toFixed(2)}
+                  ${settings.max_gift_value.toFixed(2)}
                 </span>
               </div>
               <Slider
-                value={maxGiftValue}
-                onValueChange={setMaxGiftValue}
+                value={[settings.max_gift_value]}
+                onValueChange={(val) => {
+                  setSettings(prev => ({ ...prev, max_gift_value: val[0] }))
+                  setSaveSuccess(false)
+                }}
                 max={200}
                 step={5}
                 className="[&_[data-slot=track]]:bg-white/20 [&_[data-slot=range]]:bg-thorne-indigo [&_[data-slot=thumb]]:bg-thorne-lavender [&_[data-slot=thumb]]:border-0"
@@ -99,12 +213,15 @@ export function SafeguardsSettings() {
                   MONTHLY BURN LIMIT
                 </span>
                 <span className="text-thorne-lavender font-semibold">
-                  ${monthlyBurnLimit[0].toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  ${settings.monthly_burn_limit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
               <Slider
-                value={monthlyBurnLimit}
-                onValueChange={setMonthlyBurnLimit}
+                value={[settings.monthly_burn_limit]}
+                onValueChange={(val) => {
+                  setSettings(prev => ({ ...prev, monthly_burn_limit: val[0] }))
+                  setSaveSuccess(false)
+                }}
                 max={5000}
                 step={100}
                 className="[&_[data-slot=track]]:bg-white/20 [&_[data-slot=range]]:bg-thorne-indigo [&_[data-slot=thumb]]:bg-thorne-lavender [&_[data-slot=thumb]]:border-0"

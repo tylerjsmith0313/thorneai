@@ -7,14 +7,15 @@ import {
   Calendar, 
   Database,
   Check, 
-  X, 
   Eye, 
   EyeOff, 
   Loader2,
   ExternalLink,
   Shield,
   Zap,
-  AlertCircle
+  AlertCircle,
+  Save,
+  CheckCircle
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -47,13 +48,14 @@ const defaultConfig: IntegrationConfig = {
 }
 
 export function IntegrationsSettings() {
-  const supabase = createClient()
   const [config, setConfig] = useState<IntegrationConfig>(defaultConfig)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [testing, setTesting] = useState<string | null>(null)
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   const [testResults, setTestResults] = useState<Record<string, "success" | "error" | null>>({})
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
     loadIntegrations()
@@ -61,70 +63,73 @@ export function IntegrationsSettings() {
 
   async function loadIntegrations() {
     setLoading(true)
+    const supabase = createClient()
     
-    // Get current user's tenant
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       setLoading(false)
       return
     }
 
-    const { data: tenantUser } = await supabase
-      .from("tenant_users")
-      .select("tenant_id")
+    setUserId(user.id)
+
+    // Get user integrations from user_integrations table
+    const { data } = await supabase
+      .from("user_integrations")
+      .select("*")
       .eq("user_id", user.id)
       .single()
 
-    if (tenantUser?.tenant_id) {
-      const { data } = await supabase
-        .from("tenant_integrations")
-        .select("*")
-        .eq("tenant_id", tenantUser.tenant_id)
-        .single()
-
-      if (data) {
-        setConfig({
-          mailgun_api_key: data.mailgun_api_key || "",
-          mailgun_domain: data.mailgun_domain || "",
-          mailgun_from_email: data.mailgun_from_email || "",
-          mailgun_enabled: data.mailgun_enabled || false,
-          twilio_account_sid: data.twilio_account_sid || "",
-          twilio_auth_token: data.twilio_auth_token || "",
-          twilio_phone_number: data.twilio_phone_number || "",
-          twilio_enabled: data.twilio_enabled || false,
-          google_calendar_enabled: data.google_calendar_enabled || false,
-          hubspot_api_key: data.hubspot_api_key || "",
-          hubspot_enabled: data.hubspot_enabled || false,
-        })
-      }
+    if (data) {
+      setConfig({
+        mailgun_api_key: data.mailgun_api_key || "",
+        mailgun_domain: data.mailgun_domain || "",
+        mailgun_from_email: data.mailgun_from_email || "",
+        mailgun_enabled: data.mailgun_enabled || false,
+        twilio_account_sid: data.twilio_account_sid || "",
+        twilio_auth_token: data.twilio_auth_token || "",
+        twilio_phone_number: data.twilio_phone_number || "",
+        twilio_enabled: data.twilio_enabled || false,
+        google_calendar_enabled: data.google_calendar_enabled || false,
+        hubspot_api_key: data.hubspot_api_key || "",
+        hubspot_enabled: data.hubspot_enabled || false,
+      })
     }
     
     setLoading(false)
   }
 
   async function saveIntegrations() {
-    setSaving(true)
+    if (!userId) return
     
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setSaving(false)
-      return
-    }
+    setSaving(true)
+    setSaveSuccess(false)
+    
+    const supabase = createClient()
 
-    const { data: tenantUser } = await supabase
-      .from("tenant_users")
-      .select("tenant_id")
-      .eq("user_id", user.id)
-      .single()
+    const { error } = await supabase
+      .from("user_integrations")
+      .upsert({
+        user_id: userId,
+        mailgun_api_key: config.mailgun_api_key,
+        mailgun_domain: config.mailgun_domain,
+        mailgun_from_email: config.mailgun_from_email,
+        mailgun_enabled: config.mailgun_enabled,
+        twilio_account_sid: config.twilio_account_sid,
+        twilio_auth_token: config.twilio_auth_token,
+        twilio_phone_number: config.twilio_phone_number,
+        twilio_enabled: config.twilio_enabled,
+        google_calendar_enabled: config.google_calendar_enabled,
+        hubspot_api_key: config.hubspot_api_key,
+        hubspot_enabled: config.hubspot_enabled,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id" })
 
-    if (tenantUser?.tenant_id) {
-      await supabase
-        .from("tenant_integrations")
-        .upsert({
-          tenant_id: tenantUser.tenant_id,
-          ...config,
-          updated_at: new Date().toISOString()
-        }, { onConflict: "tenant_id" })
+    if (error) {
+      console.error("[v0] Error saving integrations:", error)
+    } else {
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
     }
 
     setSaving(false)
@@ -194,8 +199,14 @@ export function IntegrationsSettings() {
           disabled={saving}
           className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-          Save All
+          {saving ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : saveSuccess ? (
+            <CheckCircle size={16} />
+          ) : (
+            <Save size={16} />
+          )}
+          {saveSuccess ? "Saved!" : "Save All"}
         </button>
       </div>
 
@@ -238,7 +249,10 @@ export function IntegrationsSettings() {
                 <input
                   type="checkbox"
                   checked={config.mailgun_enabled}
-                  onChange={(e) => setConfig(prev => ({ ...prev, mailgun_enabled: e.target.checked }))}
+                  onChange={(e) => {
+                    setConfig(prev => ({ ...prev, mailgun_enabled: e.target.checked }))
+                    setSaveSuccess(false)
+                  }}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
@@ -257,7 +271,10 @@ export function IntegrationsSettings() {
                 <input
                   type={showSecrets.mailgun_api_key ? "text" : "password"}
                   value={showSecrets.mailgun_api_key ? config.mailgun_api_key : maskValue(config.mailgun_api_key)}
-                  onChange={(e) => setConfig(prev => ({ ...prev, mailgun_api_key: e.target.value }))}
+                  onChange={(e) => {
+                    setConfig(prev => ({ ...prev, mailgun_api_key: e.target.value }))
+                    setSaveSuccess(false)
+                  }}
                   onFocus={() => setShowSecrets(prev => ({ ...prev, mailgun_api_key: true }))}
                   placeholder="key-xxxxxxxxxxxxxxxx"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-10"
@@ -278,7 +295,10 @@ export function IntegrationsSettings() {
               <input
                 type="text"
                 value={config.mailgun_domain}
-                onChange={(e) => setConfig(prev => ({ ...prev, mailgun_domain: e.target.value }))}
+                onChange={(e) => {
+                  setConfig(prev => ({ ...prev, mailgun_domain: e.target.value }))
+                  setSaveSuccess(false)
+                }}
                 placeholder="mg.yourdomain.com"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
@@ -292,7 +312,10 @@ export function IntegrationsSettings() {
             <input
               type="email"
               value={config.mailgun_from_email}
-              onChange={(e) => setConfig(prev => ({ ...prev, mailgun_from_email: e.target.value }))}
+              onChange={(e) => {
+                setConfig(prev => ({ ...prev, mailgun_from_email: e.target.value }))
+                setSaveSuccess(false)
+              }}
               placeholder="thorne@yourdomain.com"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
