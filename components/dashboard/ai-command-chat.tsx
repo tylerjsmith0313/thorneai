@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
 import { 
   Shield, User, Send, Sparkles, BarChart3, FileText, 
   Loader2, Brain, Zap, Calendar, Users, TrendingUp

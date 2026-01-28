@@ -4,11 +4,13 @@ import { useState, useEffect } from "react"
 import { 
   Send, Zap, User, Sparkles, Settings, 
   Paperclip, FileText, Calendar, Gift,
-  Loader2, Activity, X, Phone
+  Loader2, Activity, X, Phone, AlertCircle, CheckCircle
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { communicationManager } from "@/lib/services/communication-manager"
+import { sendEmail, sendTemplatedEmail, isEmailConfigured } from "@/lib/services/email-service"
+import { toast } from "sonner"
 import type { Contact } from "@/types"
+
 
 interface ConversationEngineModalProps {
   contact: Contact
@@ -25,12 +27,19 @@ interface Message {
 export function ConversationEngineModal({ contact, onClose }: ConversationEngineModalProps) {
   const [mode, setMode] = useState<"user" | "flow">("flow")
   const [message, setMessage] = useState("")
+  const [subject, setSubject] = useState(`Follow up from AgyntSynq`)
   const [isSending, setIsSending] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [aiInsight, setAiInsight] = useState<string | null>(null)
+  const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null)
   
   const supabase = createClient()
+
+  // Check if email is configured
+  useEffect(() => {
+    isEmailConfigured().then(setEmailConfigured)
+  }, [])
 
   // Load email conversations for this contact only
   useEffect(() => {
@@ -69,7 +78,8 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
     }
 
     loadEmailConversations()
-  }, [contact.id, contact.firstName, contact.lastName])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact.id])
 
   function formatTimestamp(dateString: string): string {
     const date = new Date(dateString)
@@ -93,19 +103,49 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
 
   const handleSend = async () => {
     if (!message.trim() || isSending) return
+    
+    // Check if contact has email
+    if (!contact.email) {
+      toast.error("Contact has no email address")
+      return
+    }
+    
+    // Check if email is configured
+    if (!emailConfigured) {
+      toast.error("Email service not configured. Please set up Mailgun in Control Center > Integrations.")
+      return
+    }
+    
     setIsSending(true)
 
     try {
-      await communicationManager.sendMessage(contact.id, "email", message)
-      setMessages(prev => [...prev, {
-        id: `msg-${Date.now()}`,
-        type: "ai",
-        content: message,
-        timestamp: "Just now"
-      }])
-      setMessage("")
+      const result = await sendEmail({
+        to: contact.email,
+        subject: subject,
+        text: message,
+        contactId: contact.id,
+        trackOpens: true,
+        trackClicks: true,
+        tags: ["conversation-engine", "manual"]
+      })
+      
+      if (result.success) {
+        toast.success("Email sent successfully!")
+        setMessages(prev => [...prev, {
+          id: `msg-${Date.now()}`,
+          type: "ai",
+          content: message,
+          timestamp: "Just now"
+        }])
+        setMessage("")
+        setSubject(`Follow up from AgyntSynq`)
+      } else {
+        toast.error(result.error || "Failed to send email")
+        console.error("[v0] Failed to send email:", result.error)
+      }
     } catch (error) {
-      console.error("Failed to send message:", error)
+      console.error("[v0] Failed to send message:", error)
+      toast.error("Failed to send email. Please try again.")
     } finally {
       setIsSending(false)
     }
@@ -275,16 +315,37 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
               )}
             </div>
 
-            {/* Input */}
-            <div className="p-4 border-t border-slate-100 bg-white">
-              <div className="bg-slate-50 rounded-xl p-3">
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder={`Reply to ${contact.firstName}...`}
-                  className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
-                  disabled={isSending}
-                />
+{/* Input */}
+  <div className="p-4 border-t border-slate-100 bg-white space-y-3">
+  {/* Email Config Warning */}
+  {emailConfigured === false && (
+    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+      <AlertCircle size={14} className="text-amber-600 shrink-0" />
+      <p className="text-[10px] text-amber-800">Email not configured. Set up Mailgun in Control Center to send emails.</p>
+    </div>
+  )}
+  
+  {/* Subject Line */}
+  <div className="flex items-center gap-2">
+    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subject:</span>
+    <input
+      type="text"
+      value={subject}
+      onChange={(e) => setSubject(e.target.value)}
+      placeholder="Email subject..."
+      className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+      disabled={isSending}
+    />
+  </div>
+  
+  <div className="bg-slate-50 rounded-xl p-3">
+  <textarea
+  value={message}
+  onChange={(e) => setMessage(e.target.value)}
+  placeholder={`Reply to ${contact.firstName}...`}
+  className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
+  disabled={isSending}
+  />
                 <div className="flex items-center justify-between mt-2">
                   <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
                     <Paperclip size={14} />

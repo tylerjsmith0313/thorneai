@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
 import { 
   Brain, Upload, Link, FileText, File, Trash2, 
   Send, Loader2, CheckCircle, AlertCircle, X,
@@ -29,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useSWR, { mutate } from "swr"
+import { DefaultChatTransport } from "@/utils/chat-transport" // Import DefaultChatTransport
 
 interface KnowledgeDocument {
   id: string
@@ -72,18 +72,18 @@ export function NeuralLink() {
   )
 
   // Chat for training the AI
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, append, status, setMessages } = useChat({
     id: "neural-link-training",
-    transport: new DefaultChatTransport({ api: "/api/ai/training-chat" }),
+    api: "/api/ai/training-chat",
   })
 
   const [inputValue, setInputValue] = useState("")
 
   const handleSendMessage = useCallback(() => {
     if (!inputValue.trim() || status === "streaming") return
-    sendMessage({ text: inputValue })
+    append({ role: "user", content: inputValue })
     setInputValue("")
-  }, [inputValue, sendMessage, status])
+  }, [inputValue, append, status])
 
   const handleUploadDocument = async () => {
     if (!docTitle.trim()) return
