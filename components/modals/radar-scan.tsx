@@ -1,13 +1,16 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Scan, Search, Target, Store, Utensils, Navigation, Sparkles, X, MapPin, ChevronRight, AlertCircle } from 'lucide-react'
+import { Scan, Search, Target, Store, Utensils, Navigation, Sparkles, X, MapPin, ChevronRight, AlertCircle, Loader2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { searchLeads, verifyLead, saveLeadAsContact, type EnrichedLead } from "@/lib/services/lead-enrichment"
+import { toast } from "sonner"
 
 interface RadarResult {
   title: string
   location?: { lat: number; lng: number }
   type: string
+  lead?: EnrichedLead
 }
 
 interface RadarScanProps {
@@ -21,6 +24,7 @@ export function RadarScan({ onClose, onSelect }: RadarScanProps) {
   const [results, setResults] = useState<RadarResult[]>([])
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [savingLead, setSavingLead] = useState<string | null>(null)
 
   useEffect(() => {
     // Simulate getting user location
@@ -34,16 +38,60 @@ export function RadarScan({ onClose, onSelect }: RadarScanProps) {
     setIsScanning(true)
     setError(null)
     
-    // Simulate API call
-    setTimeout(() => {
-      const mockResults: RadarResult[] = [
-        { title: "Tech Startup Hub", location: { lat: 40.7138, lng: -74.0070 }, type: "business" },
-        { title: "Innovation Center NYC", location: { lat: 40.7118, lng: -74.0050 }, type: "business" },
-        { title: "Downtown Co-working", location: { lat: 40.7148, lng: -74.0080 }, type: "office" },
-      ]
-      setResults(mockResults)
+    try {
+      // Use real lead search
+      const searchResults = await searchLeads({
+        query,
+        sources: ["GOOGLE", "LINKEDIN"],
+        location: "nearby",
+        limit: 5
+      })
+      
+      const radarResults: RadarResult[] = searchResults.leads.map((lead, i) => ({
+        title: `${lead.firstName} ${lead.lastName} - ${lead.company}`,
+        location: { 
+          lat: userLocation.lat + (Math.random() - 0.5) * 0.02, 
+          lng: userLocation.lng + (Math.random() - 0.5) * 0.02 
+        },
+        type: lead.industry || "business",
+        lead
+      }))
+      
+      setResults(radarResults)
+      
+      if (radarResults.length === 0) {
+        setError("No leads found in this area. Try a different search query.")
+      }
+    } catch (err) {
+      console.error("[v0] Radar scan error:", err)
+      setError("Failed to scan area. Please try again.")
+    } finally {
       setIsScanning(false)
-    }, 2000)
+    }
+  }
+
+  const handleSaveLead = async (result: RadarResult) => {
+    if (!result.lead) return
+    
+    setSavingLead(result.title)
+    
+    try {
+      const { lead: verifiedLead } = await verifyLead(result.lead)
+      const saveResult = await saveLeadAsContact(verifiedLead)
+      
+      if (saveResult.success) {
+        toast.success(`${result.lead.firstName} ${result.lead.lastName} added to contacts!`)
+      } else if (saveResult.error?.includes("already exists")) {
+        toast.info("Contact already exists in your database")
+      } else {
+        toast.error(saveResult.error || "Failed to save contact")
+      }
+    } catch (err) {
+      console.error("[v0] Save lead error:", err)
+      toast.error("Failed to save lead")
+    } finally {
+      setSavingLead(null)
+    }
   }
 
   return (

@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Linkedin, Facebook, Globe, Instagram, CheckCircle, UserPlus, Filter, Sparkles } from "lucide-react"
+import { useState, useTransition } from "react"
+import { Search, Linkedin, Facebook, Globe, Instagram, CheckCircle, UserPlus, Filter, Sparkles, AlertCircle, Loader2, Mail, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { searchLeads, verifyLead, saveLeadAsContact, type EnrichedLead } from "@/lib/services/lead-enrichment"
+import { toast } from "sonner"
 
 interface ContactFinderProps {
   onClose: () => void
@@ -20,6 +22,8 @@ interface FoundLead {
   phone?: string
   sources: string[]
   integrity: number
+  linkedinUrl?: string
+  verified?: boolean
 }
 
 export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
@@ -27,6 +31,9 @@ export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
   const [isSearching, setIsSearching] = useState(false)
   const [results, setResults] = useState<FoundLead[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(["LINKEDIN", "GOOGLE"])
+  const [isPending, startTransition] = useTransition()
+  const [savingId, setSavingId] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const sources = ["LINKEDIN", "FACEBOOK", "TIKTOK", "INSTAGRAM", "URL", "GOOGLE"]
 
@@ -34,51 +41,89 @@ export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
     setSelectedSources((prev) => (prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]))
   }
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!query) return
     setIsSearching(true)
+    setError(null)
 
-    // Simulate AI search across multiple sources with cross-referencing logic
-    setTimeout(() => {
-      const mockResults: FoundLead[] = [
-        {
-          id: 1,
-          name: "Alex Rivera",
-          role: "Head of Growth",
-          company: "CloudScale",
-          firstName: "Alex",
-          lastName: "Rivera",
-          email: "alex@cloudscale.io",
-          phone: "+1 (555) 902-1234",
-          sources: selectedSources.filter((s) => ["LINKEDIN", "GOOGLE", "URL"].includes(s)),
-          integrity: selectedSources.length > 2 ? 98 : 85,
-        },
-        {
-          id: 2,
-          name: "Sarah Chen",
-          role: "CTO",
-          company: "Venture Capital Partners",
-          firstName: "Sarah",
-          lastName: "Chen",
-          email: "s.chen@vcp.capital",
-          sources: selectedSources.filter((s) => ["LINKEDIN", "GOOGLE"].includes(s)),
-          integrity: selectedSources.length > 1 ? 94 : 72,
-        },
-        {
-          id: 3,
-          name: "Jordan Smyth",
-          role: "Founder",
-          company: "Smyth & Co",
-          firstName: "Jordan",
-          lastName: "Smyth",
-          email: "jordan@smyth.co",
-          sources: selectedSources.filter((s) => ["INSTAGRAM", "FACEBOOK", "GOOGLE"].includes(s)),
-          integrity: selectedSources.length > 2 ? 91 : 80,
-        },
-      ]
-      setResults(mockResults)
+    try {
+      const searchResult = await searchLeads({
+        query,
+        sources: selectedSources,
+        limit: 10
+      })
+
+      const foundLeads: FoundLead[] = searchResult.leads.map((lead, index) => ({
+        id: index + 1,
+        name: `${lead.firstName} ${lead.lastName}`,
+        role: lead.jobTitle || "Professional",
+        company: lead.company,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+        phone: lead.phone,
+        sources: lead.sources,
+        integrity: lead.confidence,
+        linkedinUrl: lead.linkedinUrl,
+        verified: lead.verified
+      }))
+
+      setResults(foundLeads)
+      
+      if (foundLeads.length === 0) {
+        setError("No leads found matching your query. Try different search terms or add more sources.")
+      }
+    } catch (err) {
+      console.error("[v0] Search error:", err)
+      setError("Failed to search for leads. Please try again.")
+    } finally {
       setIsSearching(false)
-    }, 2000)
+    }
+  }
+
+  const handleVerifyAndSave = async (lead: FoundLead) => {
+    setSavingId(lead.id)
+    
+    try {
+      // First verify the lead
+      const enrichedLead: EnrichedLead = {
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+        phone: lead.phone,
+        company: lead.company,
+        jobTitle: lead.role,
+        linkedinUrl: lead.linkedinUrl,
+        sources: lead.sources,
+        confidence: lead.integrity,
+        verified: lead.verified || false
+      }
+
+      const { lead: verifiedLead, validationResults } = await verifyLead(enrichedLead)
+      
+      // Save to database
+      const saveResult = await saveLeadAsContact(verifiedLead)
+      
+      if (saveResult.success) {
+        toast.success(`${lead.firstName} ${lead.lastName} added to contacts!`)
+        // Update local state to show verified
+        setResults(prev => prev.map(r => 
+          r.id === lead.id 
+            ? { ...r, verified: true, integrity: validationResults.overallScore }
+            : r
+        ))
+        onVerify({ ...lead, integrity: validationResults.overallScore })
+      } else if (saveResult.error?.includes("already exists")) {
+        toast.info("Contact already exists in your database")
+      } else {
+        toast.error(saveResult.error || "Failed to save contact")
+      }
+    } catch (err) {
+      console.error("[v0] Verify/save error:", err)
+      toast.error("Failed to verify and save lead")
+    } finally {
+      setSavingId(null)
+    }
   }
 
   return (
@@ -151,6 +196,13 @@ export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-10 bg-white">
+          {error && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+              <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">{error}</p>
+            </div>
+          )}
+          
           {isSearching ? (
             <div className="h-full flex flex-col items-center justify-center space-y-8 animate-pulse">
               <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600">
@@ -225,9 +277,27 @@ export function ContactFinder({ onClose, onVerify }: ContactFinderProps) {
                         </div>
                       </div>
                     </div>
-                    <Button onClick={() => onVerify(res)} className="rounded-2xl px-8 shadow-indigo-100">
-                      <UserPlus size={16} className="mr-2" />
-                      Verify Lead
+                    <Button 
+                      onClick={() => handleVerifyAndSave(res)} 
+                      disabled={savingId === res.id || res.verified}
+                      className="rounded-2xl px-8 shadow-indigo-100"
+                    >
+                      {savingId === res.id ? (
+                        <>
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : res.verified ? (
+                        <>
+                          <CheckCircle size={16} className="mr-2" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus size={16} className="mr-2" />
+                          Verify & Save
+                        </>
+                      )}
                     </Button>
                   </div>
                 ))}
