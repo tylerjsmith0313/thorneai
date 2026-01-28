@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { X, Calendar, Filter, Wind, Sparkles, MessageCircle, RefreshCw, AlertCircle, ChevronRight } from 'lucide-react'
-import type { Contact, DateFilterType } from '@/types'
+import type { Contact, DateFilterType } from '@/types.ts'
 
 interface WitheringBreakdownProps {
   contacts: Contact[]

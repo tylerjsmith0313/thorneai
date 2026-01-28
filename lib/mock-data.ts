@@ -1,4 +1,4 @@
-import type { Deal, Contact, Conversation, DateFilterType } from '@/types'
+import type { Deal, Contact, Conversation, DateFilterType } from '@/types.ts'
 
 export type { Deal, Contact, Conversation, DateFilterType }
 

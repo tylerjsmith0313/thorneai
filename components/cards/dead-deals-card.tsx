@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { FileX, AlertOctagon } from 'lucide-react'
-import type { Deal } from '@/types'
+import type { Deal } from '@/types.ts'
 
 interface DeadDealsCardProps {
   deals: Deal[]

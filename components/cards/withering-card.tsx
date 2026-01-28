@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Wind, AlertTriangle } from 'lucide-react'
-import type { Contact } from '@/types'
+import type { Contact } from '@/types.ts'
 
 interface WitheringCardProps {
   contacts: Contact[]

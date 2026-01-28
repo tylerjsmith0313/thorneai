@@ -1,7 +1,7 @@
 "use client"
 
 import { MessageSquare, Zap } from "lucide-react"
-import type { Conversation } from "@/types"
+import type { Conversation } from "@/types.ts"
 
 interface ActiveConversationsCardProps {
   conversations: Conversation[]

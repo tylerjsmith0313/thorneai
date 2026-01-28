@@ -46,9 +46,9 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
                   Pro Editor
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Thorne AI Generative Workspace
-              </p>
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Thorne AI Generative Workspace
+              </span>
             </div>
           </div>
 
