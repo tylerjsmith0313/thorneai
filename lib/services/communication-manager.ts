@@ -19,9 +19,94 @@ interface Message {
   type: "email" | "sms" | "linkedin"
 }
 
+interface MailgunConfig {
+  apiKey: string
+  domain: string
+  fromEmail: string
+  enabled: boolean
+}
+
 // User preferences (would be stored in DB per user in production)
 let userPreferences = {
   bookingLink: "https://thorne.ai/book/commander"
+}
+
+/**
+ * Fetches Mailgun credentials for the current user's tenant
+ */
+async function getMailgunConfig(): Promise<MailgunConfig | null> {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Get user's tenant
+  const { data: tenantUser } = await supabase
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!tenantUser?.tenant_id) return null
+
+  // Get tenant integrations
+  const { data: integrations } = await supabase
+    .from("tenant_integrations")
+    .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled")
+    .eq("tenant_id", tenantUser.tenant_id)
+    .single()
+
+  if (!integrations || !integrations.mailgun_enabled) return null
+
+  return {
+    apiKey: integrations.mailgun_api_key,
+    domain: integrations.mailgun_domain,
+    fromEmail: integrations.mailgun_from_email,
+    enabled: integrations.mailgun_enabled
+  }
+}
+
+/**
+ * Sends email via Mailgun using tenant-specific credentials
+ */
+async function sendViaMailgun(
+  config: MailgunConfig,
+  to: string,
+  subject: string,
+  text: string,
+  html?: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const formData = new FormData()
+    formData.append("from", config.fromEmail)
+    formData.append("to", to)
+    formData.append("subject", subject)
+    formData.append("text", text)
+    if (html) formData.append("html", html)
+
+    const response = await fetch(
+      `https://api.mailgun.net/v3/${config.domain}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`api:${config.apiKey}`).toString("base64")}`,
+        },
+        body: formData,
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      console.error("[Thorne] Mailgun send failed:", error)
+      return { success: false, error }
+    }
+
+    const data = await response.json()
+    return { success: true, messageId: data.id }
+  } catch (error) {
+    console.error("[Thorne] Mailgun error:", error)
+    return { success: false, error: String(error) }
+  }
 }
 
 /**
@@ -42,6 +127,14 @@ export const communicationManager = {
   },
 
   /**
+   * Checks if Mailgun is configured and enabled for the current tenant
+   */
+  async isMailgunEnabled(): Promise<boolean> {
+    const config = await getMailgunConfig()
+    return config !== null && config.enabled
+  },
+
+  /**
    * Dispatches a message via email and updates internal Thorne records.
    */
   async sendMessage(
@@ -50,13 +143,26 @@ export const communicationManager = {
     subject: string = "Follow up from Thorne Intelligence"
   ) {
     const supabase = await createClient()
+    const mailgunConfig = await getMailgunConfig()
 
-    // For now, we'll store the message in the conversations table
-    // In production, this would integrate with Mailgun/SendGrid
     const messageId = `msg-${Date.now()}`
+    let emailSent = false
+    let mailgunMessageId: string | undefined
+
+    // Try to send via Mailgun if configured
+    if (mailgunConfig && contact.email) {
+      const result = await sendViaMailgun(
+        mailgunConfig,
+        contact.email,
+        subject,
+        text
+      )
+      emailSent = result.success
+      mailgunMessageId = result.messageId
+    }
 
     const newMessage: Message = {
-      id: messageId,
+      id: mailgunMessageId || messageId,
       sender: "thorne",
       text: text,
       timestamp: new Date().toISOString(),
@@ -96,7 +202,12 @@ export const communicationManager = {
       })
     }
 
-    return { success: true, message: newMessage }
+    return { 
+      success: true, 
+      message: newMessage, 
+      emailSent,
+      mailgunMessageId 
+    }
   },
 
   /**
@@ -110,6 +221,24 @@ export const communicationManager = {
       body,
       `Meeting Request: Thorne x ${contact.company}`
     )
+  },
+
+  /**
+   * Sends a custom email with HTML support
+   */
+  async sendCustomEmail(
+    contact: Contact,
+    subject: string,
+    text: string,
+    html?: string
+  ) {
+    const mailgunConfig = await getMailgunConfig()
+    
+    if (!mailgunConfig || !contact.email) {
+      return { success: false, error: "Mailgun not configured or no email" }
+    }
+
+    return await sendViaMailgun(mailgunConfig, contact.email, subject, text, html)
   },
 
   /**
