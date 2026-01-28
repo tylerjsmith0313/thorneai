@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Target, Plus, FileText, Calendar } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { MeetingScheduler } from "../common/meeting-scheduler"
+import { ProposalWizard } from "@/components/modals/proposal-wizard/proposal-wizard"
 import type { Contact } from "@/types"
 
 interface OpportunitiesSectionProps {
@@ -12,6 +13,7 @@ interface OpportunitiesSectionProps {
 
 export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false)
+  const [isProposalWizardOpen, setIsProposalWizardOpen] = useState(false)
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -42,6 +44,7 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
             size="sm" 
             className="flex-1 rounded-2xl py-3 border-slate-100 text-slate-600" 
             icon={<FileText size={14} />}
+            onClick={() => setIsProposalWizardOpen(true)}
           >
             Send Proposal
           </BaseButton>
@@ -63,6 +66,13 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
         <MeetingScheduler 
           contact={contact} 
           onClose={() => setIsSchedulerOpen(false)} 
+        />
+      )}
+
+      {isProposalWizardOpen && (
+        <ProposalWizard
+          contact={contact}
+          onClose={() => setIsProposalWizardOpen(false)}
         />
       )}
     </div>
