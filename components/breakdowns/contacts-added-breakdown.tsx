@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { X, Filter, UserPlus, Search, ChevronRight } from "lucide-react"
-import type { Contact, DateFilterType } from "@/lib/mock-data"
+import type { Contact, DateFilterType } from "@/types"
 
 interface ContactsAddedBreakdownProps {
   contacts: Contact[]

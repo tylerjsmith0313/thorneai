@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Target } from 'lucide-react'
-import type { Deal } from '@/types.ts'
+import type { Deal } from '@/types'
 
 interface OpportunitiesCardProps {
   deals: Deal[]

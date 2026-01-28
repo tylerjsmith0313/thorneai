@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { X, Calendar, Filter, FileX, Sparkles, AlertCircle, ChevronRight } from "lucide-react"
-import type { Deal, DateFilterType } from "@/lib/mock-data"
+import type { Deal, DateFilterType } from "@/types"
 
 interface DeadDealsBreakdownProps {
   deals: Deal[]

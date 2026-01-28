@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { X, Sparkles, TrendingUp, Calendar, CheckCircle2, RotateCcw, Clock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import type { Deal, InsightReport } from '@/types.ts'
+import type { Deal, InsightReport } from '@/types'
 
 interface IncomeBreakdownProps {
   deals: Deal[]

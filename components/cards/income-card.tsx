@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Wallet, ArrowUpRight } from 'lucide-react'
-import type { Deal } from '@/types.ts'
+import type { Deal } from '@/types'
 
 interface IncomeCardProps {
   deals: Deal[]

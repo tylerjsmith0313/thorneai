@@ -1,7 +1,7 @@
 "use client"
 
 import { UserPlus, TrendingUp } from "lucide-react"
-import type { Contact } from "@/lib/mock-data"
+import type { Contact } from "@/types"
 
 interface ContactsAddedCardProps {
   contacts: Contact[]

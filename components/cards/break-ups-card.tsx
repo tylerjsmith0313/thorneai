@@ -1,7 +1,7 @@
 "use client"
 
 import { HeartCrack, MessageSquareOff } from "lucide-react"
-import type { Contact } from "@/lib/mock-data"
+import type { Contact } from "@/types"
 
 interface BreakUpsCardProps {
   contacts: Contact[]

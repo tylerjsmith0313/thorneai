@@ -1,7 +1,7 @@
 "use client"
 
 import { X, Database, Shield, Zap, Search, ChevronRight, HardDrive, Share2 } from "lucide-react"
-import type { Contact } from "@/lib/mock-data"
+import type { Contact } from "@/types"
 
 interface DatabaseBreakdownProps {
   contacts: Contact[]

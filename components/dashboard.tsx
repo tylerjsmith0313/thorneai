@@ -38,7 +38,7 @@ import { AddContactWizard } from "./modals/add-contact-wizard"
 import { mockDeals, mockContacts, mockConversations } from "@/lib/mock-data"
 
 // Types
-import type { Conversation } from "@/types.ts"
+import type { Conversation } from "@/types"
 
 export function Dashboard() {
   // Modal states

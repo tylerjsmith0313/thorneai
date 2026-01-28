@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { X, MessageCircle, Mail, Smartphone, Linkedin, MessageSquare, AlertCircle, Sparkles, ChevronRight } from "lucide-react"
-import type { Conversation } from "@/types.ts"
+import type { Conversation } from "@/types"
 
 interface ActiveConversationsBreakdownProps {
   conversations: Conversation[]

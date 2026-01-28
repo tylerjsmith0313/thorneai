@@ -1,7 +1,7 @@
 "use client"
 
 import { Database as DatabaseIcon, ShieldCheck, Lock } from "lucide-react"
-import type { Contact } from "@/lib/mock-data"
+import type { Contact } from "@/types"
 
 interface DatabaseCardProps {
   contacts: Contact[]
