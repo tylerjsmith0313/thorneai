@@ -2,14 +2,24 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   Mail, Phone, Globe, Building2, MapPin, Linkedin, Twitter, Instagram, Facebook, Youtube, Share2,
-  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle
+  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle, User, Users
 } from "lucide-react"
 import type { Contact } from "@/types"
 import { ThorneInsightBox } from "../common/thorne-insight-box"
 import { BaseButton } from "@/components/ui/base-button"
+import { createClient } from "@/lib/supabase/client"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+
+interface TenantUser {
+  id: string
+  user_id: string
+  email: string
+  full_name: string | null
+  role: "admin" | "user"
+}
 
 interface ProfileSectionProps {
   contact: Contact
@@ -31,6 +41,43 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
   const [showStrategy, setShowStrategy] = useState(false)
   const [strategyLoading, setStrategyLoading] = useState(false)
   const [strategy, setStrategy] = useState<string | null>(null)
+  
+  // User assignment state
+  const [teamUsers, setTeamUsers] = useState<TenantUser[]>([])
+  const [assignedTo, setAssignedTo] = useState<string | null>((contact as any).assigned_to || null)
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  
+  const supabase = createClient()
+
+  // Load team users on mount
+  useEffect(() => {
+    async function loadTeamUsers() {
+      setLoadingUsers(true)
+      const { data } = await supabase
+        .from("tenant_users")
+        .select("id, user_id, email, full_name, role")
+        .order("full_name", { ascending: true })
+      
+      if (data) {
+        setTeamUsers(data)
+      }
+      setLoadingUsers(false)
+    }
+    loadTeamUsers()
+  }, [])
+
+  // Handle assignment change
+  async function handleAssignUser(userId: string | null) {
+    setAssignedTo(userId)
+    setShowAssignDropdown(false)
+    
+    // Update in database
+    await supabase
+      .from("contacts")
+      .update({ assigned_to: userId })
+      .eq("id", contact.id)
+  }
 
   // Check if contact has an address (supports both UI type and DB type)
   const hasAddress = Boolean(
@@ -38,6 +85,9 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
     contact.address || 
     (contact as any).street_address
   )
+  
+  // Get the assigned user details
+  const assignedUser = teamUsers.find(u => u.user_id === assignedTo)
 
   const toggleChannel = (ch: string) => {
     const channel = outreachChannels.find(c => c.id === ch)
@@ -103,6 +153,100 @@ ${hasAddress ? `4. **Physical Touchpoint**
           <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} />
           <InfoItem label="Company" value={contact.company || "Not set"} icon={<Building2 size={14} />} />
           <InfoItem label="Job Title" value={contact.jobTitle || "Not set"} icon={<Globe size={14} />} />
+        </div>
+
+        {/* Assigned To Section */}
+        <div className="pt-5 border-t border-slate-100">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Assigned To</h4>
+          <div className="relative">
+            <button
+              onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+              className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all"
+            >
+              <div className="flex items-center gap-3">
+                {assignedUser ? (
+                  <>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-bold">
+                        {assignedUser.full_name?.[0] || assignedUser.email[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="text-left">
+                      <p className="text-[12px] font-semibold text-slate-800">
+                        {assignedUser.full_name || assignedUser.email}
+                      </p>
+                      <p className="text-[10px] text-slate-500">{assignedUser.role}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
+                      <User size={14} className="text-slate-400" />
+                    </div>
+                    <span className="text-[12px] text-slate-500">Unassigned</span>
+                  </>
+                )}
+              </div>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform ${showAssignDropdown ? "rotate-180" : ""}`} />
+            </button>
+
+            {showAssignDropdown && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                <div className="p-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <Users size={12} />
+                    Team Members
+                  </div>
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {/* Unassign option */}
+                  <button
+                    onClick={() => handleAssignUser(null)}
+                    className={`w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-all ${!assignedTo ? "bg-indigo-50" : ""}`}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
+                      <User size={14} className="text-slate-400" />
+                    </div>
+                    <span className="text-[12px] text-slate-600">Unassigned</span>
+                    {!assignedTo && <Check size={14} className="ml-auto text-indigo-600" />}
+                  </button>
+                  
+                  {/* Team users */}
+                  {teamUsers.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleAssignUser(user.user_id)}
+                      className={`w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-all ${assignedTo === user.user_id ? "bg-indigo-50" : ""}`}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-bold">
+                          {user.full_name?.[0] || user.email[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-left flex-1">
+                        <p className="text-[12px] font-medium text-slate-800">
+                          {user.full_name || user.email}
+                        </p>
+                        <p className="text-[10px] text-slate-500">{user.email}</p>
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        user.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {user.role}
+                      </span>
+                      {assignedTo === user.user_id && <Check size={14} className="text-indigo-600" />}
+                    </button>
+                  ))}
+                  
+                  {teamUsers.length === 0 && !loadingUsers && (
+                    <div className="p-4 text-center text-[11px] text-slate-500">
+                      No team members found. Add users in Admin Settings.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Address Section */}
