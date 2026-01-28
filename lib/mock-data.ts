@@ -1,8 +1,6 @@
-import type { Deal, Contact, Conversation } from '@/types'
+import type { Deal, Contact, Conversation, DateFilterType } from '@/types'
 
-export type DateFilterType = 'day' | 'month' | 'year' | 'custom'
-
-export type { Deal, Contact, Conversation }
+export type { Deal, Contact, Conversation, DateFilterType }
 
 export const mockDeals: Deal[] = [
   {
