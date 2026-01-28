@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   CalendarDays,
@@ -24,8 +25,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { EventCard, type Event } from "@/components/event-card"
+import { createClient } from "@/lib/supabase/client"
 
 type NavItem = "dashboard" | "events" | "settings"
+
+interface User {
+  id: string
+  email: string
+  username: string
+  avatarUrl?: string | null
+}
+
+interface CalendarDashboardProps {
+  user: User
+}
 
 const mockEvents: Event[] = [
   {
@@ -78,10 +91,34 @@ const mockEvents: Event[] = [
   },
 ]
 
-export function CalendarDashboard() {
+export function CalendarDashboard({ user }: CalendarDashboardProps) {
+  const router = useRouter()
   const [activeNav, setActiveNav] = useState<NavItem>("dashboard")
   const [quickInput, setQuickInput] = useState("")
   const [events, setEvents] = useState<Event[]>(mockEvents)
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/auth/login")
+    router.refresh()
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good morning"
+    if (hour < 18) return "Good afternoon"
+    return "Good evening"
+  }
 
   const handleQuickCreate = () => {
     if (!quickInput.trim()) return
@@ -145,14 +182,14 @@ export function CalendarDashboard() {
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
                 <Avatar className="w-9 h-9">
-                  <AvatarImage src="/placeholder-user.jpg" alt="User" />
+                  <AvatarImage src={user.avatarUrl ?? ""} alt={user.username} />
                   <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-indigo-600 text-white text-sm">
-                    JD
+                    {getInitials(user.username)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-slate-900">Jane Doe</p>
-                  <p className="text-xs text-slate-500">jane@company.com</p>
+                  <p className="text-sm font-medium text-slate-900">{user.username}</p>
+                  <p className="text-xs text-slate-500">{user.email}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -167,7 +204,10 @@ export function CalendarDashboard() {
                 Manage Billing
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem 
+                className="text-red-600 focus:text-red-600"
+                onClick={handleSignOut}
+              >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
               </DropdownMenuItem>
@@ -208,7 +248,7 @@ export function CalendarDashboard() {
             {/* Hero / Quick Create */}
             <section className="mb-10">
               <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-                Good afternoon, Jane
+                {getGreeting()}, {user.username}
               </h1>
               <p className="text-slate-500 mb-6">
                 You have {events.filter(e => e.status === "scheduled").length} events scheduled this week.
