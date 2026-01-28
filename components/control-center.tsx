@@ -12,7 +12,7 @@ import { IntegrationsSettings } from "./control-center/integrations-settings"
 
 const navItems = [
   { id: "user", label: "User Settings", icon: User },
-  { id: "automation", label: "Automation", icon: Cog },
+  { id: "automation", label: "Agynt", icon: Cog },
   { id: "products", label: "Products", icon: Package },
   { id: "knowledge", label: "Knowledge", icon: Brain },
   { id: "workflow", label: "Workflow", icon: GitBranch },

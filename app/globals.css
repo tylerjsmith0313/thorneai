@@ -38,13 +38,13 @@
   --sidebar-border: oklch(0.9220 0 0);
   --sidebar-ring: oklch(0.7080 0 0);
 
-  /* Custom Thorne colors */
-  --thorne-navy: oklch(0.25 0.05 270);
-  --thorne-indigo: oklch(0.55 0.18 270);
-  --thorne-lavender: oklch(0.75 0.12 280);
-  --thorne-success: oklch(0.6 0.18 150);
-  --thorne-warning: oklch(0.7 0.18 75);
-  --thorne-danger: oklch(0.55 0.2 25);
+  /* Custom AgyntSynq colors */
+  --agynt-navy: oklch(0.25 0.05 270);
+  --agynt-indigo: oklch(0.55 0.18 270);
+  --agynt-lavender: oklch(0.75 0.12 280);
+  --agynt-success: oklch(0.6 0.18 150);
+  --agynt-warning: oklch(0.7 0.18 75);
+  --agynt-danger: oklch(0.55 0.2 25);
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -97,12 +97,19 @@
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
-  --color-thorne-navy: var(--thorne-navy);
-  --color-thorne-indigo: var(--thorne-indigo);
-  --color-thorne-lavender: var(--thorne-lavender);
-  --color-thorne-success: var(--thorne-success);
-  --color-thorne-warning: var(--thorne-warning);
-  --color-thorne-danger: var(--thorne-danger);
+  --color-agynt-navy: var(--agynt-navy);
+  --color-agynt-indigo: var(--agynt-indigo);
+  --color-agynt-lavender: var(--agynt-lavender);
+  --color-agynt-success: var(--agynt-success);
+  --color-agynt-warning: var(--agynt-warning);
+  --color-agynt-danger: var(--agynt-danger);
+  /* Keep thorne aliases for backward compatibility */
+  --color-thorne-navy: var(--agynt-navy);
+  --color-thorne-indigo: var(--agynt-indigo);
+  --color-thorne-lavender: var(--agynt-lavender);
+  --color-thorne-success: var(--agynt-success);
+  --color-thorne-warning: var(--agynt-warning);
+  --color-thorne-danger: var(--agynt-danger);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

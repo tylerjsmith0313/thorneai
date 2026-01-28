@@ -11,8 +11,8 @@ export async function createSignupCheckoutSession(params: {
   const { email, username, userId } = params
   const stripe = getStripe()
 
-  const setupProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'thorne-setup-fee')
-  const subscriptionProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'thorne-monthly-subscription')
+  const setupProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'agynt-setup-fee')
+  const subscriptionProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'agynt-monthly-subscription')
 
   if (!setupProduct || !subscriptionProduct) {
     throw new Error('Signup products not configured')

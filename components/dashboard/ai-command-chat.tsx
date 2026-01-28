@@ -70,7 +70,7 @@ export function AICommandChat() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold text-foreground">AI Command</h3>
-          <p className="text-xs text-muted-foreground">Direct conversation with Thorne Neural Core.</p>
+          <p className="text-xs text-muted-foreground">Direct conversation with AgyntSynq Neural Core.</p>
         </div>
         <div className="flex gap-2">
           <Button

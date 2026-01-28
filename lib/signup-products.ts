@@ -9,16 +9,16 @@ export interface SignupProduct {
 
 export const SIGNUP_PRODUCTS: SignupProduct[] = [
   {
-    id: 'thorne-setup-fee',
-    name: 'Thorne AI Setup Fee',
-    description: 'One-time setup and onboarding fee for Thorne AI platform',
+    id: 'agynt-setup-fee',
+    name: 'AgyntSynq Setup Fee',
+    description: 'One-time setup and onboarding fee for AgyntSynq platform',
     priceInCents: 94900, // $949.00
     type: 'one_time',
   },
   {
-    id: 'thorne-monthly-subscription',
-    name: 'Thorne AI Monthly Subscription',
-    description: 'Monthly subscription to Thorne AI platform with full access to all features',
+    id: 'agynt-monthly-subscription',
+    name: 'AgyntSynq Monthly Subscription',
+    description: 'Monthly subscription to AgyntSynq platform with full access to all features',
     priceInCents: 49900, // $499.00
     type: 'subscription',
     interval: 'month',

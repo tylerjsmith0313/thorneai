@@ -42,7 +42,7 @@ export function DashboardHeader({
             <Shield className="w-5 h-5" />
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-base font-black text-slate-900 leading-none uppercase tracking-tight">Thorne</h1>
+            <h1 className="text-base font-black text-slate-900 leading-none uppercase tracking-tight">AgyntSynq</h1>
             <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.3em] mt-1.5">Neural Core</p>
           </div>
         </div>

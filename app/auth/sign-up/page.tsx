@@ -265,7 +265,7 @@ export default function SignUpPage() {
             <Calendar className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
-          <p className="text-slate-500 mt-2">Start automating your sales with Thorne AI</p>
+          <p className="text-slate-500 mt-2">Start automating your sales with AgyntSynq</p>
         </div>
 
         <StepIndicator />
@@ -274,7 +274,7 @@ export default function SignUpPage() {
         <div className="bg-indigo-50 rounded-xl p-4 mb-6 border border-indigo-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-indigo-900">Thorne AI Platform</p>
+              <p className="text-sm font-medium text-indigo-900">AgyntSynq Platform</p>
               <p className="text-xs text-indigo-600">$949 setup + $499/month</p>
             </div>
             <div className="text-right">
