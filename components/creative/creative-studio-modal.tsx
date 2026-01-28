@@ -1,31 +1,273 @@
 "use client"
 
-import React from "react"
-
+import React, { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Layout,
   ImageIcon,
   Share2,
   Plus,
-  MousePointer2,
   Layers,
   Type,
   Trash2,
   CheckCircle,
   X,
-  Maximize2,
   Save,
   Undo2,
   Redo2,
   Palette,
+  ChevronDown,
+  Copy,
+  Download,
+  Square,
+  Circle,
+  Triangle,
+  FileText,
+  Globe,
+  Mail,
+  Instagram,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+
+type ProjectType = "form" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
+
+interface CanvasElement {
+  id: string
+  type: "image" | "text" | "shape"
+  x: number
+  y: number
+  width: number
+  height: number
+  content?: string
+  src?: string
+  shape?: "rectangle" | "circle" | "triangle"
+  fill?: string
+  fontSize?: number
+  fontFamily?: string
+  color?: string
+  rotation?: number
+  zIndex: number
+}
 
 interface CreativeStudioModalProps {
   onClose: () => void
+  initialType?: ProjectType
+  editingAsset?: { id: string; name: string; type: ProjectType; canvas_data?: CanvasElement[] }
 }
 
-export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
+const PROJECT_TYPES: { id: ProjectType; label: string; icon: React.ElementType; description: string }[] = [
+  { id: "form", label: "Form", icon: ImageIcon, description: "Lead capture forms" },
+  { id: "landing_page", label: "Landing Page", icon: Layout, description: "Conversion pages" },
+  { id: "website", label: "Website", icon: Globe, description: "Multi-page sites" },
+  { id: "email_template", label: "Email Template", icon: Mail, description: "Email campaigns" },
+  { id: "social_story", label: "Social Story", icon: Instagram, description: "9:16 vertical stories" },
+  { id: "social_post", label: "Social Post", icon: ImageIcon, description: "1:1 square posts" },
+]
+
+const CANVAS_SIZES: Record<ProjectType, { width: number; height: number }> = {
+  social_story: { width: 1080, height: 1920 },
+  social_post: { width: 1080, height: 1080 },
+  form: { width: 600, height: 800 },
+  landing_page: { width: 1200, height: 900 },
+  website: { width: 1440, height: 900 },
+  email_template: { width: 600, height: 800 },
+}
+
+export function CreativeStudioModal({ onClose, initialType = "landing_page", editingAsset }: CreativeStudioModalProps) {
+  const supabase = createClient()
+  const canvasRef = useRef<HTMLDivElement>(null)
+  
+  const [projectType, setProjectType] = useState<ProjectType>(editingAsset?.type || initialType)
+  const [projectName, setProjectName] = useState(editingAsset?.name || "Untitled Project")
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+  const [activeLayer, setActiveLayer] = useState<string>("hero")
+  const [elements, setElements] = useState<CanvasElement[]>(editingAsset?.canvas_data || [])
+  const [selectedElement, setSelectedElement] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [history, setHistory] = useState<CanvasElement[][]>([[]])
+  const [historyIndex, setHistoryIndex] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [previewMode, setPreviewMode] = useState<string>("responsive")
+
+  const isCanvasEditor = projectType === "social_story" || projectType === "social_post"
+  const canvasSize = CANVAS_SIZES[projectType]
+
+  // Save to history for undo/redo
+  const saveToHistory = (newElements: CanvasElement[]) => {
+    const newHistory = history.slice(0, historyIndex + 1)
+    newHistory.push(newElements)
+    setHistory(newHistory)
+    setHistoryIndex(newHistory.length - 1)
+  }
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1)
+      setElements(history[historyIndex - 1])
+    }
+  }
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1)
+      setElements(history[historyIndex + 1])
+    }
+  }
+
+  // Add element to canvas
+  const addElement = (type: CanvasElement["type"], options?: Partial<CanvasElement>) => {
+    const newElement: CanvasElement = {
+      id: crypto.randomUUID(),
+      type,
+      x: canvasSize.width / 2 - 75,
+      y: canvasSize.height / 2 - 75,
+      width: type === "text" ? 300 : 150,
+      height: type === "text" ? 60 : 150,
+      zIndex: elements.length,
+      ...options,
+    }
+    
+    if (type === "text") {
+      newElement.content = "Add your text"
+      newElement.fontSize = 32
+      newElement.fontFamily = "Inter"
+      newElement.color = "#1e293b"
+    } else if (type === "shape") {
+      newElement.shape = options?.shape || "rectangle"
+      newElement.fill = "#6366f1"
+    }
+    
+    const newElements = [...elements, newElement]
+    setElements(newElements)
+    saveToHistory(newElements)
+    setSelectedElement(newElement.id)
+  }
+
+  // Delete selected element
+  const deleteElement = () => {
+    if (!selectedElement) return
+    const newElements = elements.filter(el => el.id !== selectedElement)
+    setElements(newElements)
+    saveToHistory(newElements)
+    setSelectedElement(null)
+  }
+
+  // Duplicate selected element
+  const duplicateElement = () => {
+    if (!selectedElement) return
+    const el = elements.find(e => e.id === selectedElement)
+    if (!el) return
+    
+    const newElement = {
+      ...el,
+      id: crypto.randomUUID(),
+      x: el.x + 20,
+      y: el.y + 20,
+      zIndex: elements.length,
+    }
+    const newElements = [...elements, newElement]
+    setElements(newElements)
+    saveToHistory(newElements)
+    setSelectedElement(newElement.id)
+  }
+
+  // Handle drag start
+  const handleMouseDown = (e: React.MouseEvent, elementId: string) => {
+    e.stopPropagation()
+    const element = elements.find(el => el.id === elementId)
+    if (!element || !canvasRef.current) return
+    
+    setSelectedElement(elementId)
+    setIsDragging(true)
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const scale = canvasRect.width / canvasSize.width
+    
+    setDragOffset({
+      x: e.clientX - canvasRect.left - (element.x * scale),
+      y: e.clientY - canvasRect.top - (element.y * scale),
+    })
+  }
+
+  // Handle drag
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !selectedElement || !canvasRef.current) return
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const scale = canvasRect.width / canvasSize.width
+    
+    const newX = (e.clientX - canvasRect.left - dragOffset.x) / scale
+    const newY = (e.clientY - canvasRect.top - dragOffset.y) / scale
+    
+    setElements(prev => prev.map(el => 
+      el.id === selectedElement 
+        ? { ...el, x: Math.max(0, Math.min(canvasSize.width - el.width, newX)), y: Math.max(0, Math.min(canvasSize.height - el.height, newY)) }
+        : el
+    ))
+  }
+
+  // Handle drag end
+  const handleMouseUp = () => {
+    if (isDragging) {
+      saveToHistory(elements)
+    }
+    setIsDragging(false)
+  }
+
+  // Save project to database
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const assetData = {
+        name: projectName,
+        type: projectType,
+        content_type: isCanvasEditor ? "json" as const : "html" as const,
+        canvas_data: isCanvasEditor ? elements : null,
+        content: isCanvasEditor ? null : generateHTML(),
+        metadata: { canvasSize, previewMode },
+      }
+
+      if (editingAsset?.id) {
+        await supabase
+          .from("creative_assets")
+          .update(assetData)
+          .eq("id", editingAsset.id)
+      } else {
+        await supabase
+          .from("creative_assets")
+          .insert(assetData)
+      }
+    } catch (error) {
+      console.error("[v0] Failed to save:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Generate HTML for non-canvas projects
+  const generateHTML = () => {
+    return `<!DOCTYPE html><html><head><title>${projectName}</title></head><body></body></html>`
+  }
+
+  // Get scale for canvas display
+  const getCanvasDisplaySize = () => {
+    if (isCanvasEditor) {
+      const maxWidth = 400
+      const maxHeight = 600
+      const scaleW = maxWidth / canvasSize.width
+      const scaleH = maxHeight / canvasSize.height
+      const scale = Math.min(scaleW, scaleH)
+      return {
+        width: canvasSize.width * scale,
+        height: canvasSize.height * scale,
+      }
+    }
+    return { width: 600, height: 800 }
+  }
+
+  const displaySize = getCanvasDisplaySize()
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 overflow-hidden">
       {/* Backdrop */}
@@ -54,21 +296,27 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-slate-100 p-1 rounded-2xl mr-4 border border-slate-200/50">
-              <button className="p-2 text-slate-400 hover:text-indigo-600 transition-all">
+              <button onClick={undo} disabled={historyIndex <= 0} className="p-2 text-slate-400 hover:text-indigo-600 transition-all disabled:opacity-30">
                 <Undo2 size={16} />
               </button>
-              <button className="p-2 text-slate-400 hover:text-indigo-600 transition-all border-l border-slate-200 ml-1 pl-3">
+              <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 text-slate-400 hover:text-indigo-600 transition-all border-l border-slate-200 ml-1 pl-3 disabled:opacity-30">
                 <Redo2 size={16} />
               </button>
             </div>
-            <Button variant="outline" size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent">
+            <Button variant="outline" size="sm" onClick={handleSave} disabled={saving} className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent">
               <Save size={14} className="mr-2" />
-              Save Node
+              {saving ? "Saving..." : "Save Node"}
             </Button>
             <Button size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px] px-6 shadow-indigo-200">
               <Share2 size={14} className="mr-2" />
               Deploy to API
             </Button>
+            {isCanvasEditor && (
+              <Button variant="outline" size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent">
+                <Download size={14} className="mr-2" />
+                Export
+              </Button>
+            )}
             <div className="w-px h-8 bg-slate-100 mx-2" />
             <button
               onClick={onClose}
@@ -79,6 +327,76 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
           </div>
         </header>
 
+        {/* Project Type Dropdown Bar */}
+        <div className="px-10 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
+          <div className="relative">
+            <button
+              onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+              className="flex items-center gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-all shadow-sm"
+            >
+              {(() => {
+                const TypeIcon = PROJECT_TYPES.find(t => t.id === projectType)?.icon || Layout
+                return <TypeIcon size={16} className="text-indigo-600" />
+              })()}
+              <span className="text-sm font-bold text-slate-700">
+                {PROJECT_TYPES.find(t => t.id === projectType)?.label}
+              </span>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform ${showTypeDropdown ? "rotate-180" : ""}`} />
+            </button>
+            
+            {showTypeDropdown && (
+              <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                {PROJECT_TYPES.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setProjectType(type.id)
+                      setShowTypeDropdown(false)
+                      if (type.id !== projectType) {
+                        setElements([])
+                        setSelectedElement(null)
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors ${
+                      projectType === type.id ? "bg-indigo-50" : ""
+                    }`}
+                  >
+                    <type.icon size={18} className={projectType === type.id ? "text-indigo-600" : "text-slate-400"} />
+                    <div>
+                      <div className={`text-sm font-bold ${projectType === type.id ? "text-indigo-700" : "text-slate-700"}`}>
+                        {type.label}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{type.description}</div>
+                    </div>
+                    {projectType === type.id && (
+                      <div className="ml-auto w-2 h-2 rounded-full bg-indigo-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="w-px h-6 bg-slate-200" />
+          
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            className="px-3 py-2 text-sm font-medium border border-transparent hover:border-slate-200 focus:border-indigo-300 rounded-xl bg-transparent focus:bg-white transition-all outline-none"
+            placeholder="Project name..."
+          />
+          
+          {isCanvasEditor && (
+            <>
+              <div className="w-px h-6 bg-slate-200" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {canvasSize.width} x {canvasSize.height}px
+              </span>
+            </>
+          )}
+        </div>
+
         {/* Main Workspace */}
         <div className="flex-1 overflow-hidden flex bg-slate-50/40">
           {/* Tool Sidebar */}
@@ -86,24 +404,163 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
             <section className="space-y-4">
               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
                 Canvas Layering
-                <Plus size={12} className="text-indigo-500 cursor-pointer" />
+                <button onClick={() => addElement("shape")} className="text-indigo-500 hover:text-indigo-700 transition-colors">
+                  <Plus size={12} />
+                </button>
               </h5>
               <div className="space-y-2">
-                <LayerItem icon={<ImageIcon size={14} />} label="Hero Graphics" active />
-                <LayerItem icon={<Type size={14} />} label="Conversion Copy" />
-                <LayerItem icon={<MousePointer2 size={14} />} label="Action Buttons" />
+                {elements.length === 0 ? (
+                  <>
+                    <LayerItem icon={<ImageIcon size={14} />} label="Hero Graphics" active={activeLayer === "hero"} onClick={() => setActiveLayer("hero")} />
+                    <LayerItem icon={<Type size={14} />} label="Conversion Copy" active={activeLayer === "copy"} onClick={() => setActiveLayer("copy")} />
+                    <LayerItem icon={<Square size={14} />} label="Action Buttons" active={activeLayer === "buttons"} onClick={() => setActiveLayer("buttons")} />
+                  </>
+                ) : (
+                  elements.map((el, index) => (
+                    <LayerItem
+                      key={el.id}
+                      icon={el.type === "image" ? <ImageIcon size={14} /> : el.type === "text" ? <Type size={14} /> : <Square size={14} />}
+                      label={`${el.type.charAt(0).toUpperCase() + el.type.slice(1)} ${index + 1}`}
+                      active={selectedElement === el.id}
+                      onClick={() => setSelectedElement(el.id)}
+                    />
+                  ))
+                )}
               </div>
             </section>
 
             <section className="space-y-4">
               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset Palette</h5>
               <div className="grid grid-cols-2 gap-3">
-                <AssetTool icon={<ImageIcon size={20} />} label="Images" />
-                <AssetTool icon={<Type size={20} />} label="Text" />
-                <AssetTool icon={<Layers size={20} />} label="Shapes" />
-                <AssetTool icon={<Palette size={20} />} label="Themes" />
+                <AssetTool icon={<ImageIcon size={20} />} label="Images" onClick={() => addElement("image")} />
+                <AssetTool icon={<Type size={20} />} label="Text" onClick={() => addElement("text")} />
+                <AssetTool icon={<Layers size={20} />} label="Shapes" onClick={() => addElement("shape", { shape: "rectangle" })} />
+                <AssetTool icon={<Palette size={20} />} label="Themes" onClick={() => {}} />
               </div>
             </section>
+
+            {/* Shape Tools for Canvas Editor */}
+            {isCanvasEditor && (
+              <section className="space-y-4">
+                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shape Tools</h5>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => addElement("shape", { shape: "rectangle" })}
+                    className="flex-1 p-3 bg-slate-50 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-slate-100"
+                  >
+                    <Square size={20} className="mx-auto" />
+                  </button>
+                  <button 
+                    onClick={() => addElement("shape", { shape: "circle" })}
+                    className="flex-1 p-3 bg-slate-50 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-slate-100"
+                  >
+                    <Circle size={20} className="mx-auto" />
+                  </button>
+                  <button 
+                    onClick={() => addElement("shape", { shape: "triangle" })}
+                    className="flex-1 p-3 bg-slate-50 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-slate-100"
+                  >
+                    <Triangle size={20} className="mx-auto" />
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Selected Element Controls */}
+            {selectedElement && isCanvasEditor && (
+              <section className="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                  Element Properties
+                  <div className="flex gap-1">
+                    <button onClick={duplicateElement} className="p-1.5 hover:bg-white rounded-lg transition-colors">
+                      <Copy size={12} className="text-slate-400" />
+                    </button>
+                    <button onClick={deleteElement} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 size={12} className="text-red-400" />
+                    </button>
+                  </div>
+                </h5>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Position</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={Math.round(elements.find(e => e.id === selectedElement)?.x || 0)}
+                        onChange={(e) => {
+                          const newElements = elements.map(el => 
+                            el.id === selectedElement ? { ...el, x: Number(e.target.value) } : el
+                          )
+                          setElements(newElements)
+                        }}
+                        className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg w-full"
+                        placeholder="X"
+                      />
+                      <input
+                        type="number"
+                        value={Math.round(elements.find(e => e.id === selectedElement)?.y || 0)}
+                        onChange={(e) => {
+                          const newElements = elements.map(el => 
+                            el.id === selectedElement ? { ...el, y: Number(e.target.value) } : el
+                          )
+                          setElements(newElements)
+                        }}
+                        className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg w-full"
+                        placeholder="Y"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Size</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={Math.round(elements.find(e => e.id === selectedElement)?.width || 0)}
+                        onChange={(e) => {
+                          const newElements = elements.map(el => 
+                            el.id === selectedElement ? { ...el, width: Number(e.target.value) } : el
+                          )
+                          setElements(newElements)
+                        }}
+                        className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg w-full"
+                        placeholder="W"
+                      />
+                      <input
+                        type="number"
+                        value={Math.round(elements.find(e => e.id === selectedElement)?.height || 0)}
+                        onChange={(e) => {
+                          const newElements = elements.map(el => 
+                            el.id === selectedElement ? { ...el, height: Number(e.target.value) } : el
+                          )
+                          setElements(newElements)
+                        }}
+                        className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg w-full"
+                        placeholder="H"
+                      />
+                    </div>
+                  </div>
+
+                  {elements.find(e => e.id === selectedElement)?.type === "shape" && (
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Fill Color</label>
+                      <input
+                        type="color"
+                        value={elements.find(e => e.id === selectedElement)?.fill || "#6366f1"}
+                        onChange={(e) => {
+                          const newElements = elements.map(el => 
+                            el.id === selectedElement ? { ...el, fill: e.target.value } : el
+                          )
+                          setElements(newElements)
+                        }}
+                        className="w-full h-8 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* AI Insight Box */}
             <div className="mt-auto p-6 bg-indigo-900 rounded-[32px] text-white space-y-4 relative overflow-hidden shadow-2xl shadow-indigo-100/20">
@@ -114,7 +571,10 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100">AI Design Core</span>
               </div>
               <p className="text-[11px] text-indigo-50 leading-relaxed relative z-10 italic font-medium">
-                {'"I\'ve optimized the visual hierarchy. Increasing font weight on Section 2 for a projected 8% engagement lift."'}
+                {isCanvasEditor 
+                  ? '"I\'ve analyzed your composition. Consider adding contrast to the focal point for better engagement."'
+                  : '"I\'ve optimized the visual hierarchy. Increasing font weight on Section 2 for a projected 8% engagement lift."'
+                }
               </p>
               <div className="absolute right-[-15px] bottom-[-15px] opacity-10 rotate-12 pointer-events-none">
                 <Layout size={80} />
@@ -126,57 +586,126 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
           <main className="flex-1 relative flex flex-col items-center justify-center p-12 overflow-hidden">
             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
-            <div className="relative group w-full max-w-4xl h-full max-h-full flex items-center justify-center">
-              <div className="w-full max-w-2xl bg-white shadow-[0_50px_100px_-30px_rgba(0,0,0,0.2)] rounded-[40px] aspect-[3/4] p-16 flex flex-col space-y-12 relative overflow-hidden animate-in zoom-in-95 duration-500 delay-100 ring-1 ring-slate-100">
-                <div className="w-full h-56 bg-slate-50/50 rounded-3xl flex items-center justify-center text-slate-200 border border-slate-100 group-hover:border-indigo-100 transition-all relative overflow-hidden">
-                  <ImageIcon size={64} className="opacity-50" />
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent" />
-                </div>
+            {isCanvasEditor ? (
+              /* Canvas Editor for Social Story / Social Post */
+              <div 
+                ref={canvasRef}
+                className="bg-white shadow-[0_50px_100px_-30px_rgba(0,0,0,0.2)] rounded-3xl relative overflow-hidden ring-1 ring-slate-200"
+                style={{ width: displaySize.width, height: displaySize.height }}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onClick={() => setSelectedElement(null)}
+              >
+                {/* Canvas Elements */}
+                {elements.map((el) => {
+                  const scale = displaySize.width / canvasSize.width
+                  return (
+                    <div
+                      key={el.id}
+                      className={`absolute cursor-move transition-shadow ${selectedElement === el.id ? "ring-2 ring-indigo-500 ring-offset-2" : "hover:ring-2 hover:ring-indigo-300"}`}
+                      style={{
+                        left: el.x * scale,
+                        top: el.y * scale,
+                        width: el.width * scale,
+                        height: el.height * scale,
+                        zIndex: el.zIndex,
+                      }}
+                      onMouseDown={(e) => handleMouseDown(e, el.id)}
+                    >
+                      {el.type === "text" && (
+                        <div
+                          className="w-full h-full flex items-center justify-center p-2 select-none"
+                          style={{
+                            fontSize: `${(el.fontSize || 32) * scale}px`,
+                            fontFamily: el.fontFamily,
+                            color: el.color,
+                          }}
+                        >
+                          {el.content}
+                        </div>
+                      )}
+                      {el.type === "shape" && (
+                        <div
+                          className="w-full h-full"
+                          style={{
+                            backgroundColor: el.fill,
+                            borderRadius: el.shape === "circle" ? "50%" : el.shape === "rectangle" ? "8px" : "0",
+                            clipPath: el.shape === "triangle" ? "polygon(50% 0%, 0% 100%, 100% 100%)" : undefined,
+                          }}
+                        />
+                      )}
+                      {el.type === "image" && (
+                        <div className="w-full h-full bg-slate-100 flex items-center justify-center rounded-lg border-2 border-dashed border-slate-300">
+                          <ImageIcon size={24} className="text-slate-400" />
+                        </div>
+                      )}
+                      
+                      {/* Move indicator */}
+                      {selectedElement === el.id && (
+                        <div className="absolute -top-3 -left-3 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+                          <Move size={12} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
 
-                <div className="space-y-8 flex-1">
-                  <div className="h-14 bg-slate-50/50 rounded-2xl w-3/4 border border-slate-100" />
-                  <div className="space-y-4">
-                    <div className="h-3 bg-slate-50 rounded-full w-full" />
-                    <div className="h-3 bg-slate-50 rounded-full w-full" />
-                    <div className="h-3 bg-slate-50 rounded-full w-2/3" />
+                {/* Empty State */}
+                {elements.length === 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                    <ImageIcon size={48} className="mb-4 opacity-30" />
+                    <p className="text-sm font-medium">Add elements to start designing</p>
+                    <p className="text-xs text-slate-300 mt-1">Use the asset palette on the left</p>
                   </div>
-                </div>
+                )}
+              </div>
+            ) : (
+              /* Standard Landing Page / Form Editor */
+              <div className="relative group w-full max-w-4xl h-full max-h-full flex items-center justify-center">
+                <div className="w-full max-w-2xl bg-white shadow-[0_50px_100px_-30px_rgba(0,0,0,0.2)] rounded-[40px] aspect-[3/4] p-16 flex flex-col space-y-12 relative overflow-hidden animate-in zoom-in-95 duration-500 delay-100 ring-1 ring-slate-100">
+                  <div className="w-full h-56 bg-slate-50/50 rounded-3xl flex items-center justify-center text-slate-200 border border-slate-100 group-hover:border-indigo-100 transition-all relative overflow-hidden">
+                    <ImageIcon size={64} className="opacity-50" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent" />
+                  </div>
 
-                <div className="flex justify-center pb-4">
-                  <div className="h-16 w-64 bg-indigo-600 rounded-3xl shadow-2xl shadow-indigo-100 border-4 border-white active:scale-95 transition-all cursor-pointer" />
-                </div>
+                  <div className="space-y-8 flex-1">
+                    <div className="h-14 bg-slate-50/50 rounded-2xl w-3/4 border border-slate-100" />
+                    <div className="space-y-4">
+                      <div className="h-3 bg-slate-50 rounded-full w-full" />
+                      <div className="h-3 bg-slate-50 rounded-full w-full" />
+                      <div className="h-3 bg-slate-50 rounded-full w-2/3" />
+                    </div>
+                  </div>
 
-                <div className="absolute inset-0 border-[6px] border-transparent group-hover:border-indigo-600/10 pointer-events-none transition-all rounded-[40px]" />
+                  <div className="flex justify-center pb-4">
+                    <div className="h-16 w-64 bg-indigo-600 rounded-3xl shadow-2xl shadow-indigo-100 border-4 border-white active:scale-95 transition-all cursor-pointer" />
+                  </div>
 
-                <div className="absolute top-8 right-8 flex gap-3 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                  <button className="p-3 bg-white rounded-2xl shadow-xl text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 active:scale-90">
-                    <Maximize2 size={18} />
-                  </button>
-                  <button className="p-3 bg-white rounded-2xl shadow-xl text-slate-400 hover:text-rose-600 transition-all border border-slate-100 active:scale-90">
-                    <Trash2 size={18} />
-                  </button>
+                  <div className="absolute inset-0 border-[6px] border-transparent group-hover:border-indigo-600/10 pointer-events-none transition-all rounded-[40px]" />
                 </div>
               </div>
+            )}
 
-              {/* Tool Belt */}
-              <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 flex items-center gap-6 bg-slate-900/90 backdrop-blur-2xl px-12 py-5 rounded-[28px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-white/10 animate-in slide-in-from-bottom-8 duration-500 z-30">
-                <div className="flex items-center gap-3 border-r border-white/10 pr-6 mr-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dimension</span>
-                </div>
-                <div className="flex gap-2">
-                  {["Responsive", "Mobile", "Email", "Landing"].map((format) => (
-                    <button
-                      key={format}
-                      className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                        format === "Responsive"
-                          ? "bg-indigo-600 text-white shadow-lg"
-                          : "text-slate-400 hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      {format}
-                    </button>
-                  ))}
-                </div>
+            {/* Tool Belt */}
+            <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 flex items-center gap-6 bg-slate-900/90 backdrop-blur-2xl px-12 py-5 rounded-[28px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-white/10 animate-in slide-in-from-bottom-8 duration-500 z-30">
+              <div className="flex items-center gap-3 border-r border-white/10 pr-6 mr-2">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dimension</span>
+              </div>
+              <div className="flex gap-2">
+                {["Responsive", "Mobile", "Email", "Landing"].map((format) => (
+                  <button
+                    key={format}
+                    onClick={() => setPreviewMode(format.toLowerCase())}
+                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                      previewMode === format.toLowerCase()
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "text-slate-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {format}
+                  </button>
+                ))}
               </div>
             </div>
           </main>
@@ -186,9 +715,10 @@ export function CreativeStudioModal({ onClose }: CreativeStudioModalProps) {
   )
 }
 
-function LayerItem({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }) {
+function LayerItem({ icon, label, active = false, onClick }: { icon: React.ReactNode; label: string; active?: boolean; onClick?: () => void }) {
   return (
     <button
+      onClick={onClick}
       className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all ${
         active
           ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm"
@@ -202,9 +732,12 @@ function LayerItem({ icon, label, active = false }: { icon: React.ReactNode; lab
   )
 }
 
-function AssetTool({ icon, label }: { icon: React.ReactNode; label: string }) {
+function AssetTool({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
   return (
-    <button className="flex flex-col items-center gap-2 p-5 bg-white border border-slate-100 rounded-[28px] hover:border-indigo-200 hover:shadow-xl hover:bg-indigo-50/30 transition-all text-slate-400 hover:text-indigo-600 group shadow-sm active:scale-95">
+    <button 
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 p-5 bg-white border border-slate-100 rounded-[28px] hover:border-indigo-200 hover:shadow-xl hover:bg-indigo-50/30 transition-all text-slate-400 hover:text-indigo-600 group shadow-sm active:scale-95"
+    >
       <div className="p-3 rounded-2xl bg-slate-50 group-hover:bg-white transition-all shadow-sm">{icon}</div>
       <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
     </button>
