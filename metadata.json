@@ -1,7 +1,0 @@
-{
-  "name": "Thorne Neural Core",
-  "description": "A sophisticated income tracking and deal analysis dashboard that visualizes earned income and open opportunities with AI-driven forecasting.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}
