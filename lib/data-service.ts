@@ -436,7 +436,7 @@ export async function createActivity(activity: Omit<Activity, "id" | "date">): P
   return data ? transformActivity(data) : null
 }
 
-// CONTACT ACTIVITIES
+// CONTACT ACTIVITIES - Used by history-section for tracking contact interactions
 export interface ContactActivity {
   id: string
   contactId: string
