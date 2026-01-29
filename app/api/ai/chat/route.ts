@@ -46,7 +46,7 @@ Tailor your responses to be specific to this contact. When suggesting outreach o
     }
 
     // Create tools for this user
-    const tools = createAgyntTools(user.id)
+    const tools = await createAgyntTools(user.id)
 
     // Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(messages)

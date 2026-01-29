@@ -76,7 +76,7 @@ You have access to the user's:
 Always leverage this context to provide personalized, relevant advice.`
 
 // Tool definitions for the agent
-export function createAgyntTools(userId: string) {
+export async function createAgyntTools(userId: string) {
   return {
     searchContacts: tool({
       description: "Search the user's contacts by name, company, email, or other criteria",
