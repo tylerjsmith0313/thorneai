@@ -960,11 +960,37 @@ export async function updateUserSettings(updates: Partial<UserSettings>): Promis
 export async function getDashboardStats() {
   const supabase = createClient()
   
+  // Check if user is authenticated first
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  if (authError) {
+    console.error("[v0] Auth error in getDashboardStats:", authError)
+    throw new Error("Authentication failed. Please log in again.")
+  }
+  
+  if (!user) {
+    console.error("[v0] No authenticated user in getDashboardStats")
+    throw new Error("Not authenticated. Please log in.")
+  }
+  
+  console.log("[v0] Fetching dashboard data for user:", user.id)
+  
   const [contactsRes, dealsRes, conversationsRes] = await Promise.all([
     supabase.from("contacts").select("*"),
     supabase.from("deals").select("*"),
     supabase.from("conversations").select("*"),
   ])
+
+  // Log any errors from the queries
+  if (contactsRes.error) {
+    console.error("[v0] Error fetching contacts:", contactsRes.error)
+  }
+  if (dealsRes.error) {
+    console.error("[v0] Error fetching deals:", dealsRes.error)
+  }
+  if (conversationsRes.error) {
+    console.error("[v0] Error fetching conversations:", conversationsRes.error)
+  }
 
   const contacts = (contactsRes.data || []).map(transformContact)
   const deals = (dealsRes.data || []).map(transformDeal)

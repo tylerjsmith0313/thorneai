@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Dashboard } from "./dashboard"
 import { getDashboardStats } from "@/lib/data-service"
 import type { Contact, Deal, Conversation } from "@/types"
@@ -26,18 +27,29 @@ interface DashboardData {
 }
 
 export function DashboardWrapper() {
+  const router = useRouter()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = async () => {
     try {
+      console.log("[v0] Fetching dashboard data...")
       const result = await getDashboardStats()
+      console.log("[v0] Dashboard data loaded successfully")
       setData(result)
       setError(null)
     } catch (err) {
       console.error("[v0] Error fetching dashboard data:", err)
-      setError("Failed to load dashboard data")
+      const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard data"
+      
+      // If authentication error, redirect to login
+      if (errorMessage.includes("authenticated") || errorMessage.includes("Authentication")) {
+        router.push("/auth/login")
+        return
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
