@@ -22,8 +22,8 @@ export default async function EmbedFormPage({
     notFound()
   }
 
-  // Extract form config from metadata or canvas_data
-  const formConfig = form.metadata?.formConfig || form.canvas_data || null
+  // Extract form config from canvas_data (where FormBuilder saves it)
+  const formConfig = form.canvas_data || form.metadata?.formConfig || null
 
   return (
     <html>

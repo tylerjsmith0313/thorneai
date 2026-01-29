@@ -1,4 +1,3 @@
-// Embeddable form page - /app/embed/form/[formId]/page.tsx should import this
 "use client"
 
 import { useState } from "react"
