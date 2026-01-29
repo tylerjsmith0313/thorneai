@@ -1,23 +1,27 @@
 'use server'
 
 import { getStripe } from '@/lib/stripe'
-import { SIGNUP_PRODUCTS } from '@/lib/signup-products'
 
 export async function createSignupCheckoutSession(params: {
   email: string
   username: string
   userId: string
   companyName: string
+  planId?: string
+  seatCount?: number
+  monthlyPrice?: number
 }) {
-  const { email, username, userId, companyName } = params
+  const { 
+    email, 
+    username, 
+    userId, 
+    companyName,
+    planId = 'agyntsync',
+    seatCount = 1,
+    monthlyPrice = 249
+  } = params
+  
   const stripe = getStripe()
-
-  const setupProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'agynt-setup-fee')
-  const subscriptionProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'agynt-monthly-subscription')
-
-  if (!setupProduct || !subscriptionProduct) {
-    throw new Error('Signup products not configured')
-  }
 
   // Create or get customer
   const customers = await stripe.customers.list({ email, limit: 1 })
@@ -31,38 +35,32 @@ export async function createSignupCheckoutSession(params: {
       metadata: {
         username,
         userId,
+        companyName,
       },
     })
     customerId = customer.id
   }
 
-  // Create checkout session with both one-time fee and subscription
+  // Determine product name based on plan
+  const productName = planId === 'agyntsync' 
+    ? `AgyntSync Neural Bundle${seatCount > 1 ? ` (${seatCount} seats)` : ''}`
+    : `Agyntos Standard${seatCount > 1 ? ` (${seatCount} seats)` : ''}`
+
+  // Create checkout session with subscription
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     ui_mode: 'embedded',
     redirect_on_completion: 'never',
     line_items: [
-      // One-time setup fee
+      // Monthly subscription based on selected plan and seats
       {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: setupProduct.name,
-            description: setupProduct.description,
+            name: productName,
+            description: `Monthly subscription to ${planId === 'agyntsync' ? 'AgyntSync' : 'Agyntos'} platform with ${seatCount} user seat${seatCount > 1 ? 's' : ''}`,
           },
-          unit_amount: setupProduct.priceInCents,
-        },
-        quantity: 1,
-      },
-      // Monthly subscription
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: subscriptionProduct.name,
-            description: subscriptionProduct.description,
-          },
-          unit_amount: subscriptionProduct.priceInCents,
+          unit_amount: monthlyPrice * 100, // Convert to cents
           recurring: {
             interval: 'month',
           },
@@ -75,6 +73,8 @@ export async function createSignupCheckoutSession(params: {
       metadata: {
         username,
         userId,
+        planId,
+        seatCount: seatCount.toString(),
       },
     },
     metadata: {
@@ -82,8 +82,8 @@ export async function createSignupCheckoutSession(params: {
       userId,
       type: 'signup',
       tenantName: companyName,
-      planId: 'agynt-standard',
-      seatCount: '1',
+      planId,
+      seatCount: seatCount.toString(),
       email,
     },
   })

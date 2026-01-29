@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { planId, seatCount, tenantName, email } = session.metadata || {}
+  const { planId, seatCount, tenantName, email, userId } = session.metadata || {}
   
   if (!planId || !tenantName || !email) {
     console.error("[v0] Missing metadata in checkout session")
@@ -101,11 +101,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return
   }
 
+  // Look up the user by email to get their actual user ID
+  let actualUserId = userId
+  
+  if (!actualUserId || actualUserId === "pending") {
+    // Try to find the user by email
+    const { data: userData } = await supabase
+      .from("auth.users")
+      .select("id")
+      .eq("email", email)
+      .single()
+    
+    if (userData) {
+      actualUserId = userData.id
+    }
+  }
+
   // Create the owner as an admin user
-  // Note: The actual user_id will be set when they sign up/login
   const { error: userError } = await supabase.from("tenant_users").insert({
     tenant_id: tenant.id,
-    user_id: "00000000-0000-0000-0000-000000000000", // Placeholder until user signs up
+    user_id: actualUserId || "00000000-0000-0000-0000-000000000000", // Placeholder until user signs up
     email,
     role: "admin",
     is_owner: true,
@@ -115,7 +130,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.error("[v0] Failed to create tenant user:", userError)
   }
 
-  console.log(`[v0] Created tenant ${tenant.name} with ${seatCount} seats`)
+  console.log(`[v0] Created tenant ${tenant.name} with ${seatCount} seats for ${email}`)
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {

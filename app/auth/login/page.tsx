@@ -1,172 +1,267 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Calendar, Loader2, Eye, EyeOff } from "lucide-react"
+import { Shield, ArrowLeft, ArrowRight, User, Loader2 } from "lucide-react"
+
+type AuthStep = "email" | "password" | "authenticating" | "error"
+
+interface ChatMessage {
+  id: string
+  type: "system" | "user"
+  content: string
+  timestamp: Date
+}
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [step, setStep] = useState<AuthStep>("email")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [inputValue, setInputValue] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [sessionTimeout, setSessionTimeout] = useState(false)
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "1",
+      type: "system",
+      content: "Welcome back, Customer. I am Thorne. Identify yourself to access the Neural Feed.",
+      timestamp: new Date(),
+    },
+  ])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (searchParams.get('reason') === 'session_timeout') {
-      setSessionTimeout(true)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: "timeout",
+          type: "system",
+          content: "Your session has expired due to inactivity. Please re-authenticate to continue.",
+          timestamp: new Date(),
+        },
+      ])
     }
   }, [searchParams])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [step])
+
+  const addMessage = (type: "system" | "user", content: string) => {
+    setMessages((prev) => [
       ...prev,
-      [e.target.name]: e.target.value,
-    }))
-    setError(null)
+      {
+        id: Date.now().toString(),
+        type,
+        content,
+        timestamp: new Date(),
+      },
+    ])
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setIsLoading(true)
+    if (!inputValue.trim() || isLoading) return
 
-    try {
-      const supabase = createClient()
+    const value = inputValue.trim()
+    setInputValue("")
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      })
-
-      if (signInError) {
-        setError(signInError.message)
-        setIsLoading(false)
+    if (step === "email") {
+      // Validate email format
+      if (!value.includes("@") || !value.includes(".")) {
+        addMessage("user", value)
+        addMessage("system", "Invalid identification format. Please provide a valid email address.")
         return
       }
 
-      router.push("/")
-      router.refresh()
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-    } finally {
-      setIsLoading(false)
+      setEmail(value)
+      addMessage("user", value)
+      setTimeout(() => {
+        addMessage("system", "Confirmed. Now, please provide your Credentials (Password).")
+        setStep("password")
+      }, 500)
+    } else if (step === "password") {
+      setPassword(value)
+      addMessage("user", "•".repeat(value.length))
+      setStep("authenticating")
+      setIsLoading(true)
+
+      try {
+        const supabase = createClient()
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: value,
+        })
+
+        if (signInError) {
+          setStep("error")
+          setIsLoading(false)
+          setTimeout(() => {
+            addMessage("system", `Authentication failed: ${signInError.message}. Please verify your credentials and try again.`)
+            setStep("email")
+            setEmail("")
+            setPassword("")
+          }, 500)
+          return
+        }
+
+        addMessage("system", "Identity verified. Access granted. Redirecting to Neural Feed...")
+        setTimeout(() => {
+          router.push("/")
+          router.refresh()
+        }, 1500)
+      } catch {
+        setStep("error")
+        setIsLoading(false)
+        addMessage("system", "A system error occurred. Please try again later.")
+        setStep("email")
+        setEmail("")
+        setPassword("")
+      }
+    }
+  }
+
+  const getInputLabel = () => {
+    switch (step) {
+      case "email":
+        return "IDENTIFICATION (EMAIL)"
+      case "password":
+        return "CREDENTIALS (PASSWORD)"
+      case "authenticating":
+        return "AUTHENTICATING..."
+      default:
+        return "IDENTIFICATION (EMAIL)"
+    }
+  }
+
+  const getInputPlaceholder = () => {
+    switch (step) {
+      case "email":
+        return "Enter email..."
+      case "password":
+        return "Enter password..."
+      default:
+        return "Enter email..."
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 text-white mb-4">
-            <Calendar className="w-6 h-6" />
+        {/* Chat Container */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden flex flex-col h-[600px]">
+          {/* Header */}
+          <div className="flex items-center gap-4 p-4 border-b border-slate-100">
+            <Link
+              href="/auth"
+              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-indigo-500" />
+              </div>
+              <span className="font-semibold tracking-wide text-slate-900">THORNE AUTH CORE</span>
+            </div>
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">Welcome back</h1>
-          <p className="text-slate-500 mt-2">Sign in to your account</p>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+                {message.type === "system" && (
+                  <div className="flex items-start gap-3 max-w-[85%]">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+                        <p className="text-slate-700 text-sm">{message.content}</p>
+                      </div>
+                      <p className="text-xs text-indigo-500 font-medium mt-1 ml-1">NOW</p>
+                    </div>
+                  </div>
+                )}
+                {message.type === "user" && (
+                  <div className="flex items-start gap-3 max-w-[85%]">
+                    <div>
+                      <div className="bg-indigo-500 text-white rounded-2xl rounded-tr-sm px-4 py-3">
+                        <p className="text-sm">{message.content}</p>
+                      </div>
+                      <p className="text-xs text-indigo-500 font-medium mt-1 mr-1 text-right">NOW</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-slate-600" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {isLoading && step === "authenticating" && (
+              <div className="flex justify-start">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-4 border-t border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-500" />
+              <span className="text-xs font-medium text-indigo-500 tracking-wider">{getInputLabel()}</span>
+            </div>
+            <form onSubmit={handleSubmit} className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type={step === "password" ? "password" : "text"}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={getInputPlaceholder()}
+                  className="w-full px-4 py-3 rounded-full bg-slate-100 border-0 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={isLoading || step === "authenticating"}
+                  autoComplete={step === "password" ? "current-password" : "email"}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isLoading || step === "authenticating"}
+                className="px-6 py-3 bg-indigo-500 text-white rounded-full font-medium flex items-center gap-2 hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                CONFIRM
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
-          <form onSubmit={handleLogin} className="space-y-5">
-            {sessionTimeout && (
-              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                Your session has expired due to inactivity. Please sign in again.
-              </div>
-            )}
-
-            {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                className="h-11 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
-                disabled={isLoading}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-slate-700">
-                  Password
-                </Label>
-                <Link
-                  href="/auth/forgot-password"
-                  className="text-sm text-indigo-600 hover:text-indigo-700"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="h-11 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 pr-10"
-                  disabled={isLoading}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-500">
-              Don't have an account?{" "}
-              <Link href="/auth/sign-up" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Create one
-              </Link>
-            </p>
-          </div>
+        {/* Footer Links */}
+        <div className="mt-4 text-center">
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm text-slate-500 hover:text-slate-700"
+          >
+            Forgot your credentials?
+          </Link>
         </div>
       </div>
     </div>
