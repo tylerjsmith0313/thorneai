@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Contact, Deal, Conversation, Product, KnowledgeSource, Activity, UserSettings } from "@/types"
 
+// Data service for all database operations
+
 // Transform database row (snake_case) to frontend type (camelCase)
 function transformContact(row: any): Contact {
   return {
