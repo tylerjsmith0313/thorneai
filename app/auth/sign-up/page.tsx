@@ -3,6 +3,7 @@
 import React, { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { 
   Shield, 
@@ -12,11 +13,13 @@ import {
   Phone, 
   Building2, 
   ArrowRight, 
+  ArrowLeft,
   Zap, 
   Loader2,
   CreditCard,
   Users,
-  Database
+  Database,
+  Lock
 } from "lucide-react"
 import { getEmailValidationError, isBusinessEmail } from "@/lib/email-validation"
 
@@ -30,7 +33,7 @@ const SignupCheckout = dynamic(() => import("@/components/signup/signup-checkout
   ),
 })
 
-type Step = "identity" | "plan" | "payment" | "activation"
+type Step = "identity" | "plan" | "password" | "payment" | "activation"
 
 interface Plan {
   id: string
@@ -53,7 +56,7 @@ const PLANS: Plan[] = [
     name: "AGYNTSYNC",
     description: "Full Neural Network automation, multi-channel flows, and AI support.",
     basePrice: 249,
-    pricePerSeat: 99, // $99 per additional 5 users after first
+    pricePerSeat: 99,
   },
 ]
 
@@ -77,17 +80,19 @@ export default function SignUpPage() {
   const [selectedPlan, setSelectedPlan] = useState<string>("agyntsync")
   const [seatCount, setSeatCount] = useState(1)
   
-  // Activation
+  // Password
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [isActivating, setIsActivating] = useState(false)
+  
+  // Activation
   const [activationComplete, setActivationComplete] = useState(false)
 
   const steps = [
     { id: "identity", label: "IDENTITY REGISTRY", number: "01" },
     { id: "plan", label: "BILL PLAN CALIBRATION", number: "02" },
-    { id: "payment", label: "SECURE SETTLEMENT", number: "03" },
-    { id: "activation", label: "SYSTEM ACTIVATION", number: "04" },
+    { id: "password", label: "SET CREDENTIALS", number: "03" },
+    { id: "payment", label: "SECURE SETTLEMENT", number: "04" },
+    { id: "activation", label: "SYSTEM ACTIVATION", number: "05" },
   ]
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep)
@@ -114,7 +119,6 @@ export default function SignUpPage() {
   const handleIdentitySubmit = async () => {
     setError(null)
 
-    // Validation
     if (!formData.firstName.trim()) {
       setError("First name is required")
       return
@@ -134,10 +138,12 @@ export default function SignUpPage() {
       return
     }
 
-    if (!isBusinessEmail(formData.email)) {
-      setError("Please use a corporate or business email address")
-      return
-    }
+    // Note: Business email validation disabled for testing
+    // Uncomment to require business emails in production:
+    // if (!isBusinessEmail(formData.email)) {
+    //   setError("Please use a corporate or business email address")
+    //   return
+    // }
 
     if (!formData.companyName.trim()) {
       setError("Company name is required")
@@ -148,14 +154,10 @@ export default function SignUpPage() {
   }
 
   const handlePlanSubmit = () => {
-    setCurrentStep("payment")
+    setCurrentStep("password")
   }
 
-  const handlePaymentComplete = () => {
-    setCurrentStep("activation")
-  }
-
-  const handleActivation = async () => {
+  const handlePasswordSubmit = async () => {
     setError(null)
 
     if (password.length < 6) {
@@ -168,7 +170,7 @@ export default function SignUpPage() {
       return
     }
 
-    setIsActivating(true)
+    setIsLoading(true)
 
     try {
       const supabase = createClient()
@@ -190,19 +192,26 @@ export default function SignUpPage() {
 
       if (signUpError) {
         setError(signUpError.message)
-        setIsActivating(false)
+        setIsLoading(false)
         return
       }
 
       if (data.user) {
         setUserId(data.user.id)
-        setActivationComplete(true)
+        setCurrentStep("payment")
+      } else {
+        setError("Failed to create account. Please try again.")
       }
     } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
-      setIsActivating(false)
+      setIsLoading(false)
     }
+  }
+
+  const handlePaymentComplete = () => {
+    setActivationComplete(true)
+    setCurrentStep("activation")
   }
 
   // Sidebar Component
@@ -266,8 +275,18 @@ export default function SignUpPage() {
   // Identity Registry Step
   const IdentityStep = () => (
     <div className="flex-1">
-      <h2 className="text-3xl font-bold text-slate-900 italic mb-2">IDENTITY NODE</h2>
-      <p className="text-slate-500 mb-8">Establish your corporate signature for CRM routing.</p>
+      <div className="flex items-center gap-4 mb-6">
+        <Link
+          href="/auth"
+          className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-slate-600" />
+        </Link>
+        <div>
+          <h2 className="text-3xl font-bold text-slate-900 italic">IDENTITY NODE</h2>
+          <p className="text-slate-500">Establish your corporate signature for CRM routing.</p>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
@@ -402,7 +421,7 @@ export default function SignUpPage() {
               </div>
             )}
             
-            {plan.id === "agyntsync" && (
+            {plan.id === "agyntsync" && selectedPlan !== plan.id && (
               <div className="absolute top-4 right-4 text-[8px] font-bold tracking-wider text-indigo-400">
                 POWERED<br />BY<br />THORNE
               </div>
@@ -458,8 +477,13 @@ export default function SignUpPage() {
 
         <div className="flex justify-between mt-3 text-xs text-slate-500">
           <span>1 USER (${selectedPlan === "agyntsync" ? "249" : "99"})</span>
-          <span>5 USERS (${selectedPlan === "agyntsync" ? "495" : "495"})</span>
+          <span>5 USERS (${selectedPlan === "agyntsync" ? "249" : "495"})</span>
           <span>SCALING (+$99 / 5 USERS)</span>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-sm text-slate-600">Monthly Total:</span>
+          <span className="text-2xl font-bold text-indigo-500">${calculatePrice()}/mo</span>
         </div>
       </div>
 
@@ -476,6 +500,75 @@ export default function SignUpPage() {
           Secure Authorization
           <ArrowRight className="w-5 h-5" />
         </button>
+      </div>
+    </div>
+  )
+
+  // Password Step (NEW - before payment)
+  const PasswordStep = () => (
+    <div className="flex-1">
+      <div className="flex flex-col items-center mb-8">
+        <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+          <Lock className="w-8 h-8 text-indigo-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">SET YOUR PASSWORD</h2>
+        <p className="text-slate-500 text-sm">Create your secure credentials before payment.</p>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6 max-w-md mx-auto">
+        <div>
+          <label className="text-xs font-medium text-slate-400 tracking-wider mb-2 block">
+            PASSWORD
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Min. 6 characters"
+            className="w-full px-4 py-4 rounded-xl bg-slate-100 border-0 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-slate-400 tracking-wider mb-2 block">
+            CONFIRM PASSWORD
+          </label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm your password"
+            className="w-full px-4 py-4 rounded-xl bg-slate-100 border-0 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          onClick={handlePasswordSubmit}
+          disabled={isLoading}
+          className="w-full bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl py-4 font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              CREATING ACCOUNT...
+            </>
+          ) : (
+            <>
+              <ArrowRight className="w-5 h-5" />
+              CONTINUE TO PAYMENT
+            </>
+          )}
+        </button>
+
+        <p className="text-xs text-slate-500 text-center">
+          You will receive an activation email from Supabase to verify your account.
+        </p>
       </div>
     </div>
   )
@@ -500,7 +593,7 @@ export default function SignUpPage() {
           <SignupCheckout
             email={formData.email}
             username={`${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`}
-            userId={userId || "pending"}
+            userId={userId || ""}
             companyName={formData.companyName}
             planId={selectedPlan}
             seatCount={seatCount}
@@ -512,110 +605,47 @@ export default function SignUpPage() {
     </div>
   )
 
-  // Activation Step
-  const ActivationStep = () => {
-    if (activationComplete) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="relative mb-8">
-            {/* Background decoration */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-48 h-48 rounded-full bg-indigo-50 opacity-50" />
-            </div>
-            <div className="relative w-24 h-24 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-4xl font-bold text-indigo-500">
-                {formData.firstName.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          </div>
-
-          <h2 className="text-3xl font-bold italic text-slate-900 mb-4">SYSTEM ACTIVATED</h2>
-          <p className="text-slate-500 text-center max-w-md mb-6">
-            Stand by. Thorne is currently cloning the master CRM schema in Supabase for your dedicated v0 tenant...
-          </p>
-
-          <div className="w-64 mb-4">
-            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 rounded-full animate-pulse w-2/3" />
-            </div>
-          </div>
-          <p className="text-xs text-indigo-500 tracking-wider">CLONING SCHEMA NODES...</p>
-
-          <p className="mt-8 text-sm text-slate-500 text-center">
-            Check your email to verify your account and complete activation.
-          </p>
+  // Activation Step (Success)
+  const ActivationStep = () => (
+    <div className="flex-1 flex flex-col items-center justify-center py-12">
+      <div className="relative mb-8">
+        {/* Background decoration */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-48 h-48 rounded-full bg-indigo-50 opacity-50" />
         </div>
-      )
-    }
-
-    return (
-      <div className="flex-1">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-indigo-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">SET YOUR PASSWORD</h2>
-          <p className="text-slate-500 text-sm">Create your secure credentials to activate your account.</p>
-        </div>
-
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-          <div>
-            <label className="text-xs font-medium text-slate-400 tracking-wider mb-2 block">
-              PASSWORD
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 characters"
-              className="w-full px-4 py-4 rounded-xl bg-slate-100 border-0 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-400 tracking-wider mb-2 block">
-              CONFIRM PASSWORD
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
-              className="w-full px-4 py-4 rounded-xl bg-slate-100 border-0 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <button
-            onClick={handleActivation}
-            disabled={isActivating}
-            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl py-4 font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isActivating ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                ACTIVATING...
-              </>
-            ) : (
-              <>
-                <Zap className="w-5 h-5" />
-                ACTIVATE SYSTEM
-              </>
-            )}
-          </button>
-
-          <p className="text-xs text-slate-500 text-center">
-            You will receive an activation email from Supabase to verify your account.
-          </p>
+        <div className="relative w-24 h-24 rounded-full bg-indigo-100 flex items-center justify-center">
+          <span className="text-4xl font-bold text-indigo-500">
+            {formData.firstName.charAt(0).toUpperCase()}
+          </span>
         </div>
       </div>
-    )
-  }
+
+      <h2 className="text-3xl font-bold italic text-slate-900 mb-4">SYSTEM ACTIVATED</h2>
+      <p className="text-slate-500 text-center max-w-md mb-6">
+        Stand by. Thorne is currently cloning the master CRM schema in Supabase for your dedicated v0 tenant...
+      </p>
+
+      <div className="w-64 mb-4">
+        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-500 rounded-full animate-pulse w-2/3" />
+        </div>
+      </div>
+      <p className="text-xs text-indigo-500 tracking-wider mb-8">CLONING SCHEMA NODES...</p>
+
+      <div className="bg-slate-50 rounded-xl p-4 max-w-md text-center">
+        <p className="text-sm text-slate-600 mb-4">
+          Check your email to verify your account and complete activation.
+        </p>
+        <Link
+          href="/auth/login"
+          className="inline-flex items-center gap-2 text-indigo-500 hover:text-indigo-600 font-medium"
+        >
+          <ArrowRight className="w-4 h-4" />
+          Go to Login
+        </Link>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -626,6 +656,7 @@ export default function SignUpPage() {
           <div className="flex-1 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
             {currentStep === "identity" && <IdentityStep />}
             {currentStep === "plan" && <PlanStep />}
+            {currentStep === "password" && <PasswordStep />}
             {currentStep === "payment" && <PaymentStep />}
             {currentStep === "activation" && <ActivationStep />}
           </div>
