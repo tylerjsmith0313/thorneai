@@ -75,7 +75,7 @@ You have access to the user's:
 
 Always leverage this context to provide personalized, relevant advice.`
 
-// Tool definitions for the agent
+// Tool definitions for the agent - Updated 2026-01-29
 export async function createAgyntTools(userId: string) {
   return {
     searchContacts: tool({
