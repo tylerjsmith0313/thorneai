@@ -1,3 +1,5 @@
+"use client"
+
 import { createClient } from "@/lib/supabase/client"
 
 // Contact activity management for tracking interactions with contacts

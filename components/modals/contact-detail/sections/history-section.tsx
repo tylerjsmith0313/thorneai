@@ -1,5 +1,6 @@
 "use client"
 
+// History section component for displaying contact activity timeline
 import { useState, useEffect, useCallback } from "react"
 import { Gift, Phone, Mail, MessageSquare, History, Edit3, User, Building2, Eye, PlusCircle, ChevronRight, Loader2, Calendar, Video, Clock } from "lucide-react"
 import type { Activity, Contact } from "@/types"
