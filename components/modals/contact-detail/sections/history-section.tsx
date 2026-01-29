@@ -1,3 +1,4 @@
+// History Section Component - Rebuilt Jan 2026
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -51,7 +52,7 @@ async function getContactActivities(contactId: string): Promise<ContactActivity[
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("[v0] Error fetching contact activities:", error)
+    console.error("Error fetching contact activities:", error)
     return []
   }
 
@@ -71,7 +72,7 @@ async function createContactActivity(activity: {
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
-    console.error("[v0] No authenticated user")
+    console.error("No authenticated user")
     return null
   }
 
@@ -90,7 +91,7 @@ async function createContactActivity(activity: {
     .single()
 
   if (error) {
-    console.error("[v0] Error creating contact activity:", error)
+    console.error("Error creating contact activity:", error)
     return null
   }
 
