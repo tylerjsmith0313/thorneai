@@ -37,7 +37,7 @@ export function EngagementCadence() {
           </div>
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Neural Workflow Core</h3>
           <p className="text-sm text-slate-500 font-medium italic mt-2">
-            {'"Thorne designs the sequence; you provide the soul and the boundaries."'}
+            {'"AgyntSynq designs the sequence; you provide the soul and the boundaries."'}
           </p>
         </div>
         <Button
@@ -173,7 +173,7 @@ export function EngagementCadence() {
             <div className="flex-1 relative z-10">
               <Textarea
                 className="h-full bg-transparent border-none text-indigo-100 p-0 text-sm font-bold font-mono focus:ring-0 placeholder:text-slate-700 leading-relaxed shadow-none resize-none"
-                placeholder="[SYSTEM DIRECTIVE]: If the lead mentions a competitor, Thorne must pivot to the 'Frictionless Migration' knowledge node. Never mention pricing on the first SMS..."
+                placeholder="[SYSTEM DIRECTIVE]: If the lead mentions a competitor, AgyntSynq must pivot to the 'Frictionless Migration' knowledge node. Never mention pricing on the first SMS..."
               />
             </div>
 
@@ -214,7 +214,7 @@ export function EngagementCadence() {
         <div className="space-y-1 flex-1">
           <h5 className="text-sm font-black text-amber-900 uppercase tracking-tight">Manual Intervention Protocol</h5>
           <p className="text-xs text-amber-700/80 font-medium leading-relaxed">
-            Thorne is programmed to hand over the thread to you if the lead expresses negative sentiment or requests a meeting outside
+            AgyntSynq is programmed to hand over the thread to you if the lead expresses negative sentiment or requests a meeting outside
             of your configured availability nodes.
             <span className="font-black border-b-2 border-amber-200 ml-1 cursor-pointer hover:text-amber-900">Manage Thresholds</span>
           </p>

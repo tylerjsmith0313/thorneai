@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import ThorneInsightBox from "@/components/thorne-insight-box" // Import ThorneInsightBox
 
 import { useState, useEffect } from "react"
 import { 
@@ -8,7 +9,6 @@ import {
   Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle, User, Users
 } from "lucide-react"
 import type { Contact } from "@/types"
-import { ThorneInsightBox } from "../common/thorne-insight-box"
 import { BaseButton } from "@/components/ui/base-button"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -172,10 +172,6 @@ ${hasAddress ? `4. **Physical Touchpoint**
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <ThorneInsightBox 
-        insight={`"This contact is showing 'Hot' signals through LinkedIn activity. Suggested next step: ${hasAddress ? "Send a personalized physical gift based on their interests." : "Consider a LinkedIn message or email outreach."}"`} 
-      />
-
       {/* Verified Information */}
       <div className="bg-white border border-slate-200 rounded-[32px] p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between">
@@ -423,7 +419,7 @@ ${hasAddress ? `4. **Physical Touchpoint**
               <Sparkles size={18} className="text-indigo-400" />
             </div>
             <div>
-              <h4 className="text-sm font-bold tracking-tight">Thorne AI Strategy</h4>
+              <h4 className="text-sm font-bold tracking-tight">AI Strategy</h4>
               <p className="text-[10px] text-indigo-300 font-medium">Personalized outreach plan</p>
             </div>
           </div>

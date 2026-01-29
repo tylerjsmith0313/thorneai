@@ -10,6 +10,7 @@ interface ChatInputProps {
   value: string
   onChange: (val: string) => void
   onSend: () => void
+  onAgyntDraft: () => void
   onThorneDraft: () => void
   placeholder?: string
 }
@@ -18,6 +19,7 @@ export function ChatInput({
   value,
   onChange,
   onSend,
+  onAgyntDraft,
   onThorneDraft,
   placeholder,
 }: ChatInputProps) {
@@ -63,9 +65,9 @@ export function ChatInput({
           size="sm"
           icon={<Zap size={16} />}
           className="rounded-xl border-indigo-200 text-indigo-600 bg-indigo-50/50"
-          onClick={onThorneDraft}
+          onClick={onAgyntDraft}
         >
-          Thorne Draft
+          Agynt Draft
         </BaseButton>
         <BaseButton
           variant="primary"

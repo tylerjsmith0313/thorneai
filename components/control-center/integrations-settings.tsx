@@ -191,7 +191,7 @@ export function IntegrationsSettings() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Connected Services</h2>
           <p className="text-sm text-slate-500 mt-1 italic">
-            "Configure external services to power Thorne's communication capabilities."
+            "Configure external services to power AgyntSynq's communication capabilities."
           </p>
         </div>
         <button
@@ -316,7 +316,7 @@ export function IntegrationsSettings() {
                 setConfig(prev => ({ ...prev, mailgun_from_email: e.target.value }))
                 setSaveSuccess(false)
               }}
-              placeholder="thorne@yourdomain.com"
+              placeholder="hello@yourdomain.com"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>

@@ -116,7 +116,7 @@ export function ProductPortfolio() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Product Portfolio</h3>
-          <p className="text-sm text-slate-500 mt-1">Configure the offers Thorne will present to leads.</p>
+          <p className="text-sm text-slate-500 mt-1">Configure the offers AgyntSynq will present to leads.</p>
         </div>
         <BaseButton variant="dark" icon={<Plus size={18} />} onClick={() => setIsAddModalOpen(true)}>
           Add Product

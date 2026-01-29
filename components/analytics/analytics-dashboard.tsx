@@ -174,7 +174,7 @@ export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
             <div className="animate-spin">
               <Brain className="w-8 h-8 text-indigo-600" />
             </div>
-            <p className="text-slate-600 font-medium">Thorne Neural Network processing...</p>
+            <p className="text-slate-600 font-medium">AgyntSynq Intelligence processing...</p>
           </CardContent>
         </Card>
       </div>
@@ -191,7 +191,7 @@ export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
                 <Brain className="w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-lg font-bold">THORNE NEURAL NETWORK</CardTitle>
+                <CardTitle className="text-lg font-bold">AGYNTSYNQ INTELLIGENCE</CardTitle>
                 <CardDescription className="text-slate-300">Real-time Analytics & Intelligence</CardDescription>
               </div>
             </div>

@@ -107,7 +107,7 @@ export function UserSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl font-bold text-slate-900 tracking-tight">ACCOUNT DETAILS</h3>
-          <p className="text-sm text-slate-500 mt-1">"Manage your personal digital signature within the Thorne Core."</p>
+          <p className="text-sm text-slate-500 mt-1">"Manage your personal digital signature within the AgyntSynq Core."</p>
         </div>
         <BaseButton 
           variant="primary" 

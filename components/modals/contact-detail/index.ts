@@ -11,5 +11,4 @@ export { ChatSection } from "./sections/chat-section"
 export { HistorySection } from "./sections/history-section"
 
 // Common
-export { ThorneInsightBox } from "./common/thorne-insight-box"
 export { MeetingScheduler } from "./common/meeting-scheduler"
