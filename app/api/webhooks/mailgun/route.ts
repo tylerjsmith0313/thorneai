@@ -57,6 +57,206 @@ async function parseMailgunPayload(request: NextRequest) {
   }
 }
 
+// Handle tracking events (opens, clicks, bounces, etc.)
+async function handleTrackingEvent(eventType: string, payload: Record<string, string>) {
+  const messageId = payload["message-id"] || payload["Message-Id"] || payload.messageId
+  const recipient = payload.recipient || payload.to
+
+  if (!messageId) {
+    console.warn("[v0] No message ID in tracking event")
+    return null
+  }
+
+  // Map Mailgun event types to our status
+  const statusMap: Record<string, string> = {
+    "delivered": "delivered",
+    "opened": "opened",
+    "clicked": "clicked",
+    "bounced": "bounced",
+    "dropped": "failed",
+    "complained": "complained",
+    "unsubscribed": "unsubscribed",
+  }
+
+  const newStatus = statusMap[eventType]
+  if (!newStatus) return null
+
+  // Update email status
+  const { data: email, error } = await supabase
+    .from("email_messages")
+    .update({
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+      mailgun_variables: supabase.rpc ? undefined : {
+        last_event: eventType,
+        last_event_at: new Date().toISOString(),
+        ...(payload.url && { clicked_url: payload.url }),
+      }
+    })
+    .eq("message_id", messageId)
+    .select("id, contact_id, tenant_id")
+    .single()
+
+  if (error) {
+    // Try matching by recipient email for outbound emails
+    const { data: emailByRecipient } = await supabase
+      .from("email_messages")
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("to_email", recipient)
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .select("id, contact_id, tenant_id")
+      .single()
+
+    if (emailByRecipient) {
+      return emailByRecipient
+    }
+    console.error("[v0] Error updating email status:", error)
+    return null
+  }
+
+  // Create conversation event for significant events
+  if (email?.contact_id && ["opened", "clicked", "bounced"].includes(eventType)) {
+    await supabase.from("conversation_events").insert({
+      contact_id: email.contact_id,
+      tenant_id: email.tenant_id,
+      event_type: `email_${eventType}`,
+      event_data: {
+        email_id: email.id,
+        ...(payload.url && { url: payload.url }),
+      },
+    })
+
+    // Update contact engagement for opens/clicks
+    if (["opened", "clicked"].includes(eventType)) {
+      await supabase
+        .from("contacts")
+        .update({
+          last_contact_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", email.contact_id)
+    }
+  }
+
+  return email
+}
+
+// Handle incoming email (stored message)
+async function handleIncomingEmail(payload: Record<string, string>) {
+  const emailData = {
+    messageId: payload["Message-Id"] || payload["message-id"] || payload.messageId,
+    from: payload.from || payload.sender,
+    to: payload.recipient || payload.To || payload.to,
+    subject: payload.subject || payload.Subject,
+    bodyPlain: payload["body-plain"] || payload.bodyPlain || payload["stripped-text"],
+    bodyHtml: payload["body-html"] || payload.bodyHtml || payload["stripped-html"],
+    strippedText: payload["stripped-text"],
+    strippedHtml: payload["stripped-html"],
+    timestamp: payload.timestamp ? new Date(parseInt(payload.timestamp) * 1000).toISOString() : new Date().toISOString(),
+    attachments: payload.attachments ? JSON.parse(payload.attachments) : [],
+    headers: payload["message-headers"] ? JSON.parse(payload["message-headers"]) : {},
+    inReplyTo: payload["In-Reply-To"] || payload["in-reply-to"],
+    references: payload.References || payload.references,
+  }
+
+  console.log("[v0] Received incoming email:", {
+    from: emailData.from,
+    to: emailData.to,
+    subject: emailData.subject,
+  })
+
+  // Extract sender email address
+  const senderMatch = emailData.from?.match(/<([^>]+)>/) || [null, emailData.from]
+  const senderEmail = senderMatch[1] || emailData.from
+
+  // Find the contact by email (using tenant-based schema)
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("id, tenant_id")
+    .eq("email", senderEmail?.toLowerCase())
+    .single()
+
+  // Store the incoming email in the database (using tenant-based schema)
+  const { data: storedEmail, error: storeError } = await supabase
+    .from("email_messages")
+    .insert({
+      message_id: emailData.messageId,
+      contact_id: contact?.id || null,
+      tenant_id: contact?.tenant_id || null,
+      direction: "inbound",
+      from_email: emailData.from,
+      to_email: emailData.to,
+      subject: emailData.subject,
+      body_plain: emailData.bodyPlain,
+      body_html: emailData.bodyHtml,
+      stripped_text: emailData.strippedText,
+      received_at: emailData.timestamp,
+      in_reply_to: emailData.inReplyTo,
+      references_header: emailData.references,
+      attachments: emailData.attachments,
+      mailgun_variables: {
+        headers: emailData.headers,
+      },
+      status: "received",
+    })
+    .select()
+    .single()
+
+  if (storeError) {
+    console.error("[v0] Error storing email:", storeError)
+  }
+
+  // If we found a contact, update their last activity
+  if (contact) {
+    await supabase
+      .from("contacts")
+      .update({
+        last_contact_date: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", contact.id)
+
+    // Create a conversation event
+    await supabase.from("conversation_events").insert({
+      contact_id: contact.id,
+      tenant_id: contact.tenant_id,
+      event_type: "email_received",
+      event_data: {
+        email_id: storedEmail?.id,
+        from: emailData.from,
+        subject: emailData.subject,
+        preview: emailData.strippedText?.substring(0, 200),
+      },
+    })
+
+    // Create notification for the tenant users
+    const { data: tenantUsers } = await supabase
+      .from("tenant_users")
+      .select("user_id")
+      .eq("tenant_id", contact.tenant_id)
+
+    if (tenantUsers && tenantUsers.length > 0) {
+      const notifications = tenantUsers.map((tu) => ({
+        tenant_id: contact.tenant_id,
+        user_id: tu.user_id,
+        title: "New Email Received",
+        message: `${senderEmail} sent: ${emailData.subject || "(no subject)"}`,
+        type: "info",
+        contact_id: contact.id,
+      }))
+
+      await supabase.from("notifications").insert(notifications)
+    }
+  }
+
+  return { storedEmail, contact }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const payload = await parseMailgunPayload(request)
@@ -74,120 +274,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Extract email data
-    const emailData = {
-      messageId: payload["Message-Id"] || payload["message-id"] || payload.messageId,
-      from: payload.from || payload.sender,
-      to: payload.recipient || payload.To || payload.to,
-      subject: payload.subject || payload.Subject,
-      bodyPlain: payload["body-plain"] || payload.bodyPlain || payload["stripped-text"],
-      bodyHtml: payload["body-html"] || payload.bodyHtml || payload["stripped-html"],
-      strippedText: payload["stripped-text"],
-      strippedHtml: payload["stripped-html"],
-      timestamp: payload.timestamp ? new Date(parseInt(payload.timestamp) * 1000).toISOString() : new Date().toISOString(),
-      attachments: payload.attachments ? JSON.parse(payload.attachments) : [],
-      headers: payload["message-headers"] ? JSON.parse(payload["message-headers"]) : {},
-      inReplyTo: payload["In-Reply-To"] || payload["in-reply-to"],
-      references: payload.References || payload.references,
-    }
+    // Determine event type
+    const eventType = payload.event || payload["event-data"]?.event || "stored"
 
-    console.log("[v0] Received incoming email:", {
-      from: emailData.from,
-      to: emailData.to,
-      subject: emailData.subject,
-    })
+    console.log("[v0] Mailgun webhook event:", eventType)
 
-    // Extract sender email address
-    const senderMatch = emailData.from?.match(/<([^>]+)>/) || [null, emailData.from]
-    const senderEmail = senderMatch[1] || emailData.from
-
-    // Find the contact by email (using tenant-based schema)
-    const { data: contact } = await supabase
-      .from("contacts")
-      .select("id, tenant_id")
-      .eq("email", senderEmail?.toLowerCase())
-      .single()
-
-    // Store the incoming email in the database (using tenant-based schema)
-    const { data: storedEmail, error: storeError } = await supabase
-      .from("email_messages")
-      .insert({
-        message_id: emailData.messageId,
-        contact_id: contact?.id || null,
-        tenant_id: contact?.tenant_id || null,
-        direction: "inbound",
-        from_email: emailData.from,
-        to_email: emailData.to,
-        subject: emailData.subject,
-        body_plain: emailData.bodyPlain,
-        body_html: emailData.bodyHtml,
-        stripped_text: emailData.strippedText,
-        received_at: emailData.timestamp,
-        in_reply_to: emailData.inReplyTo,
-        references_header: emailData.references,
-        attachments: emailData.attachments,
-        mailgun_variables: {
-          headers: emailData.headers,
-        },
-        status: "received",
+    // Handle different event types
+    if (eventType === "stored" || payload["body-plain"] || payload.from) {
+      // Incoming email
+      const { storedEmail, contact } = await handleIncomingEmail(payload)
+      return NextResponse.json({
+        success: true,
+        message: "Email processed",
+        emailId: storedEmail?.id,
+        contactId: contact?.id,
       })
-      .select()
-      .single()
-
-    if (storeError) {
-      console.error("[v0] Error storing email:", storeError)
-      // Don't fail the webhook, Mailgun will retry
-    }
-
-    // If we found a contact, update their last activity
-    if (contact) {
-      await supabase
-        .from("contacts")
-        .update({
-          last_contact_date: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", contact.id)
-
-      // Create a conversation event
-      await supabase.from("conversation_events").insert({
-        contact_id: contact.id,
-        tenant_id: contact.tenant_id,
-        event_type: "email_received",
-        event_data: {
-          email_id: storedEmail?.id,
-          from: emailData.from,
-          subject: emailData.subject,
-          preview: emailData.strippedText?.substring(0, 200),
-        },
+    } else if (["delivered", "opened", "clicked", "bounced", "dropped", "complained", "unsubscribed"].includes(eventType)) {
+      // Tracking event
+      const email = await handleTrackingEvent(eventType, payload)
+      return NextResponse.json({
+        success: true,
+        message: `Event ${eventType} processed`,
+        emailId: email?.id,
       })
-
-      // Create notification for the tenant users
-      const { data: tenantUsers } = await supabase
-        .from("tenant_users")
-        .select("user_id")
-        .eq("tenant_id", contact.tenant_id)
-
-      if (tenantUsers && tenantUsers.length > 0) {
-        const notifications = tenantUsers.map((tu) => ({
-          tenant_id: contact.tenant_id,
-          user_id: tu.user_id,
-          title: "New Email Received",
-          message: `${senderEmail} sent: ${emailData.subject || "(no subject)"}`,
-          type: "info",
-          contact_id: contact.id,
-        }))
-
-        await supabase.from("notifications").insert(notifications)
-      }
+    } else {
+      // Unknown event type, log and acknowledge
+      console.log("[v0] Unknown Mailgun event type:", eventType, payload)
+      return NextResponse.json({
+        success: true,
+        message: "Event acknowledged",
+      })
     }
-
-    return NextResponse.json({
-      success: true,
-      message: "Email processed",
-      emailId: storedEmail?.id,
-      contactId: contact?.id,
-    })
   } catch (error) {
     console.error("[v0] Error processing Mailgun webhook:", error)
     return NextResponse.json(
