@@ -1072,7 +1072,6 @@ export async function getDashboardStats() {
   const hotContacts = contacts.filter(c => c.status === "Hot")
   
   const activeConversations = conversations.filter(c => c.status !== "responded")
-  const thorneManaged = conversations.filter(c => c.status === "thorne_handling")
 
   return {
     contacts,
@@ -1090,7 +1089,6 @@ export async function getDashboardStats() {
       closedWonDeals: closedWonDeals.length,
       closedLostDeals: deals.filter(d => d.status === "closed-lost").length,
       activeConversations: activeConversations.length,
-      thorneManaged: thorneManaged.length,
     }
   }
 }

@@ -1,4 +1,4 @@
--- Seed sample data for Thorne Neural Core
+-- Seed sample data for AgyntSynq CRM
 -- This script inserts realistic sample data for testing and demonstration
 -- Run this AFTER running create-tables.sql
 
@@ -28,7 +28,7 @@ BEGIN
     (SELECT email FROM auth.users WHERE id = demo_user_id),
     'Demo',
     'User',
-    'Thorne Industries',
+    'AgyntSynq Solutions',
     'Sales Director'
   ON CONFLICT (id) DO NOTHING;
 
@@ -61,7 +61,7 @@ BEGIN
   INSERT INTO conversations (user_id, contact_id, channel, status, unread_count, last_message, last_active) VALUES
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'sarah.chen@acmecorp.com' AND user_id = demo_user_id), 'Email', 'responded', 0, 'Looking forward to the demo tomorrow!', NOW() - INTERVAL '2 hours'),
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'david.m@nexgenlabs.io' AND user_id = demo_user_id), 'LinkedIn', 'awaiting_reply', 1, 'Can we schedule a follow-up call?', NOW() - INTERVAL '6 hours'),
-    (demo_user_id, (SELECT id FROM contacts WHERE email = 'anna.p@enterprise.co' AND user_id = demo_user_id), 'SMS', 'thorne_handling', 0, 'Thorne is handling the initial outreach...', NOW() - INTERVAL '1 day'),
+    (demo_user_id, (SELECT id FROM contacts WHERE email = 'anna.p@enterprise.co' AND user_id = demo_user_id), 'SMS', 'active', 0, 'AI is handling the initial outreach...', NOW() - INTERVAL '1 day'),
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'l.anderson@dataflow.com' AND user_id = demo_user_id), 'Email', 'awaiting_reply', 2, 'Let me review the proposal and get back to you.', NOW() - INTERVAL '3 days'),
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'emily.w@globalstart.com' AND user_id = demo_user_id), 'WhatsApp', 'responded', 0, 'Thanks for the quick response!', NOW() - INTERVAL '4 hours');
 
@@ -92,23 +92,23 @@ BEGIN
 
   -- Insert sample products
   INSERT INTO products (user_id, name, pitch_context, classification, retail_price, cost, volume, billing_interval, is_deployed) VALUES
-    (demo_user_id, 'Thorne AI Pro', 'Enterprise-grade AI sales assistant with full automation capabilities', 'SaaS', 499.00, 50.00, 1, 'monthly', true),
-    (demo_user_id, 'Thorne AI Starter', 'Perfect for small teams getting started with AI-powered sales', 'SaaS', 99.00, 20.00, 1, 'monthly', true),
+    (demo_user_id, 'AgyntSynq Pro', 'Enterprise-grade AI sales assistant with full automation capabilities', 'SaaS', 499.00, 50.00, 1, 'monthly', true),
+    (demo_user_id, 'AgyntSynq Starter', 'Perfect for small teams getting started with AI-powered sales', 'SaaS', 99.00, 20.00, 1, 'monthly', true),
     (demo_user_id, 'Implementation Package', 'Full onboarding and training for enterprise clients', 'Service', 5000.00, 2000.00, 1, 'one-time', true),
     (demo_user_id, 'Annual Enterprise License', 'Unlimited users with dedicated support', 'Subscription', 4999.00, 500.00, 1, 'annual', true),
     (demo_user_id, 'Sales Strategy Consulting', '4-week intensive sales optimization program', 'Consulting', 15000.00, 5000.00, 1, 'one-time', false);
 
   -- Insert sample knowledge sources
   INSERT INTO knowledge_sources (user_id, name, type, source_url, content, is_active) VALUES
-    (demo_user_id, 'Company Overview', 'document', NULL, 'Thorne Industries is a leading provider of AI-powered sales automation solutions...', true),
-    (demo_user_id, 'Product Documentation', 'url', 'https://docs.thorne.ai', NULL, true),
-    (demo_user_id, 'Sales Playbook', 'pdf', 'https://files.thorne.ai/playbook.pdf', NULL, true),
+    (demo_user_id, 'Company Overview', 'document', NULL, 'AgyntSynq is a leading provider of AI-powered sales automation solutions...', true),
+    (demo_user_id, 'Product Documentation', 'url', 'https://docs.agyntsynq.com', NULL, true),
+    (demo_user_id, 'Sales Playbook', 'pdf', 'https://files.agyntsynq.com/playbook.pdf', NULL, true),
     (demo_user_id, 'Competitor Analysis', 'text', NULL, 'Key differentiators: AI-first approach, seamless CRM integration, autonomous outreach...', true);
 
   -- Insert sample activities
   INSERT INTO activities (user_id, contact_id, deal_id, type, title, detail, created_at) VALUES
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'sarah.chen@acmecorp.com' AND user_id = demo_user_id), (SELECT id FROM deals WHERE client_name = 'Acme Corp' AND user_id = demo_user_id), 'Human', 'Deal Closed', 'Successfully closed the Acme Corp deal for $25,000', NOW() - INTERVAL '10 days'),
-    (demo_user_id, (SELECT id FROM contacts WHERE email = 'david.m@nexgenlabs.io' AND user_id = demo_user_id), NULL, 'Thorne', 'AI Outreach Sent', 'Thorne sent personalized LinkedIn message', NOW() - INTERVAL '1 day'),
+    (demo_user_id, (SELECT id FROM contacts WHERE email = 'david.m@nexgenlabs.io' AND user_id = demo_user_id), NULL, 'AI', 'AI Outreach Sent', 'AI sent personalized LinkedIn message', NOW() - INTERVAL '1 day'),
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'anna.p@enterprise.co' AND user_id = demo_user_id), NULL, 'Gift', 'Gift Sent', 'Personalized gift box delivered to Anna', NOW() - INTERVAL '5 days'),
     (demo_user_id, (SELECT id FROM contacts WHERE email = 'm.torres@techventures.io' AND user_id = demo_user_id), NULL, 'System', 'Status Changed', 'Contact status changed from Hot to Withering', NOW() - INTERVAL '3 days'),
     (demo_user_id, NULL, NULL, 'Update', 'Settings Updated', 'Automation mode changed to Full Auto', NOW() - INTERVAL '7 days');

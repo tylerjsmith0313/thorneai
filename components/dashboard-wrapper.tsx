@@ -21,7 +21,6 @@ interface DashboardData {
     closedWonDeals: number
     closedLostDeals: number
     activeConversations: number
-    thorneManaged: number
   }
 }
 
