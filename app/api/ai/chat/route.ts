@@ -1,6 +1,7 @@
 import { streamText, convertToModelMessages, UIMessage } from "ai"
 import { createClient } from "@/lib/supabase/server"
-import { AGYNT_SYSTEM_INSTRUCTIONS, createAgyntTools, getUserAIContext } from "@/lib/ai/agynt-agent"
+import { AGYNT_SYSTEM_INSTRUCTIONS } from "@/lib/ai/agynt-constants"
+import { createAgyntTools, getUserAIContext } from "@/lib/ai/agynt-agent"
 
 export async function POST(req: Request) {
   try {
