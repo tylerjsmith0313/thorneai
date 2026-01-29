@@ -16,10 +16,11 @@ interface SignupCheckoutProps {
   email: string
   username: string
   userId: string
+  companyName: string
   onComplete: () => void
 }
 
-export default function SignupCheckout({ email, username, userId, onComplete }: SignupCheckoutProps) {
+export default function SignupCheckout({ email, username, userId, companyName, onComplete }: SignupCheckoutProps) {
   const [isReady, setIsReady] = useState(false)
 
   const fetchClientSecret = useCallback(async () => {
@@ -27,9 +28,10 @@ export default function SignupCheckout({ email, username, userId, onComplete }: 
       email,
       username,
       userId,
+      companyName,
     })
     return clientSecret!
-  }, [email, username, userId])
+  }, [email, username, userId, companyName])
 
   useEffect(() => {
     setIsReady(true)

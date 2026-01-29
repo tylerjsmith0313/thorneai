@@ -31,6 +31,7 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
+    companyName: "",
     username: "",
     email: "",
     password: "",
@@ -59,6 +60,16 @@ export default function SignUpPage() {
     setError(null)
 
     // Validation
+    if (!formData.companyName.trim()) {
+      setError("Company name is required")
+      return
+    }
+
+    if (formData.companyName.length < 2) {
+      setError("Company name must be at least 2 characters")
+      return
+    }
+
     if (!formData.username.trim()) {
       setError("Username is required")
       return
@@ -235,10 +246,11 @@ export default function SignUpPage() {
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
               </div>
             }>
-              <SignupCheckout
-                email={formData.email}
-                username={formData.username}
-                userId={userId}
+<SignupCheckout
+  email={formData.email}
+  username={formData.username}
+  userId={userId}
+  companyName={formData.companyName}
                 onComplete={handlePaymentComplete}
               />
             </Suspense>
@@ -292,6 +304,23 @@ export default function SignUpPage() {
                 {error}
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="companyName" className="text-slate-700">
+                Company Name
+              </Label>
+              <Input
+                id="companyName"
+                name="companyName"
+                type="text"
+                placeholder="Acme Inc."
+                value={formData.companyName}
+                onChange={handleChange}
+                className="h-11 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500"
+                disabled={isLoading}
+                required
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="username" className="text-slate-700">

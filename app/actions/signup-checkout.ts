@@ -7,8 +7,9 @@ export async function createSignupCheckoutSession(params: {
   email: string
   username: string
   userId: string
+  companyName: string
 }) {
-  const { email, username, userId } = params
+  const { email, username, userId, companyName } = params
   const stripe = getStripe()
 
   const setupProduct = SIGNUP_PRODUCTS.find((p) => p.id === 'agynt-setup-fee')
@@ -80,6 +81,10 @@ export async function createSignupCheckoutSession(params: {
       username,
       userId,
       type: 'signup',
+      tenantName: companyName,
+      planId: 'agynt-standard',
+      seatCount: '1',
+      email,
     },
   })
 
