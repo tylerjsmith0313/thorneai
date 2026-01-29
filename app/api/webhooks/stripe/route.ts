@@ -66,7 +66,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { planId, seatCount, tenantName, email } = session.metadata || {}
+  const metadata = session.metadata || {}
+  
+  // Handle onboarding checkout (new user signup)
+  if (metadata.type === "onboarding") {
+    return handleOnboardingCheckout(session)
+  }
+  
+  // Legacy flow for tenant creation
+  const { planId, seatCount, tenantName, email } = metadata
   
   if (!planId || !tenantName || !email) {
     console.error("[v0] Missing metadata in checkout session")
@@ -116,6 +124,74 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   console.log(`[v0] Created tenant ${tenant.name} with ${seatCount} seats`)
+}
+
+// Handle onboarding checkout for new users signing up
+async function handleOnboardingCheckout(session: Stripe.Checkout.Session) {
+  const { userId, company, plan, userCount } = session.metadata || {}
+  
+  if (!userId || !company || !plan) {
+    console.error("[v0] Missing onboarding metadata in checkout session")
+    return
+  }
+
+  // Generate a URL-safe slug from the company name
+  const slug = company
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    + "-" + Date.now().toString(36)
+
+  // Create the tenant for the new subscriber
+  const { data: tenant, error: tenantError } = await supabase
+    .from("tenants")
+    .insert({
+      name: company,
+      slug,
+      stripe_customer_id: session.customer as string,
+      stripe_subscription_id: session.subscription as string,
+      subscription_status: "active",
+      plan: plan,
+      seat_count: parseInt(userCount || "1"),
+      max_seats: plan === "agynt-sync" ? parseInt(userCount || "1") : 1,
+    })
+    .select()
+    .single()
+
+  if (tenantError) {
+    console.error("[v0] Failed to create tenant:", tenantError)
+    return
+  }
+
+  // Update the user record with subscription info
+  const { error: userUpdateError } = await supabase
+    .from("users")
+    .update({
+      tenant_id: tenant.id,
+      subscription_plan: plan,
+      subscription_status: "active",
+      stripe_customer_id: session.customer as string,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (userUpdateError) {
+    console.error("[v0] Failed to update user with subscription:", userUpdateError)
+  }
+
+  // Add user to tenant_users
+  const { error: tenantUserError } = await supabase.from("tenant_users").insert({
+    tenant_id: tenant.id,
+    user_id: userId,
+    role: "admin",
+    is_owner: true,
+  })
+
+  if (tenantUserError) {
+    console.error("[v0] Failed to create tenant user:", tenantUserError)
+  }
+
+  console.log(`[v0] Onboarding complete: Created tenant ${tenant.name} for user ${userId} on ${plan} plan`)
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {

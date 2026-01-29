@@ -32,8 +32,8 @@ export default function SignUpSuccessPage() {
           </div>
 
           <Button asChild className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
-            <Link href="/auth/login">
-              Continue to login
+            <Link href="/onboarding">
+              Continue to Setup
               <ArrowRight className="w-4 h-4 ml-2" />
             </Link>
           </Button>

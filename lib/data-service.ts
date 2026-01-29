@@ -436,11 +436,18 @@ export async function createActivity(activity: Omit<Activity, "id" | "date">): P
   return data ? transformActivity(data) : null
 }
 
-// CONTACT ACTIVITIES - Used by history-section for tracking contact interactions
+// ============================================================================
+// CONTACT ACTIVITIES
+// Used by history-section.tsx for tracking contact interactions
+// Exports: ContactActivity (type), getContactActivities, createContactActivity
+// ============================================================================
+
+export type ContactActivityType = 'email' | 'call' | 'meeting' | 'note' | 'task' | 'gift' | 'other'
+
 export interface ContactActivity {
   id: string
   contactId: string
-  type: 'email' | 'call' | 'meeting' | 'note' | 'task' | 'gift' | 'other'
+  type: ContactActivityType
   title: string
   description?: string
   date: string
@@ -449,8 +456,10 @@ export interface ContactActivity {
 
 export async function getContactActivities(contactId: string): Promise<ContactActivity[]> {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) return []
 
   const { data, error } = await supabase
@@ -461,27 +470,29 @@ export async function getContactActivities(contactId: string): Promise<ContactAc
     .limit(50)
 
   if (error) {
-    console.error("[v0] Error fetching contact activities:", error)
+    console.error("Error fetching contact activities:", error)
     return []
   }
 
   return (data || []).map((item) => ({
     id: item.id,
     contactId: item.contact_id,
-    type: item.type || 'other',
-    title: item.title || '',
-    description: item.detail || '',
+    type: (item.type as ContactActivityType) || "other",
+    title: item.title || "",
+    description: item.detail || "",
     date: item.created_at,
-    metadata: {}
+    metadata: {},
   }))
 }
 
 export async function createContactActivity(
-  activity: Omit<ContactActivity, 'id' | 'date'>
+  activity: Omit<ContactActivity, "id" | "date">
 ): Promise<ContactActivity | null> {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) return null
 
   const { data, error } = await supabase
@@ -497,19 +508,21 @@ export async function createContactActivity(
     .single()
 
   if (error) {
-    console.error("[v0] Error creating contact activity:", error)
+    console.error("Error creating contact activity:", error)
     return null
   }
 
-  return data ? {
-    id: data.id,
-    contactId: data.contact_id,
-    type: data.type || 'other',
-    title: data.title || '',
-    description: data.detail || '',
-    date: data.created_at,
-    metadata: {}
-  } : null
+  return data
+    ? {
+        id: data.id,
+        contactId: data.contact_id,
+        type: (data.type as ContactActivityType) || "other",
+        title: data.title || "",
+        description: data.detail || "",
+        date: data.created_at,
+        metadata: {},
+      }
+    : null
 }
 
 // CALENDAR EVENTS
