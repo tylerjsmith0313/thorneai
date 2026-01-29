@@ -8,6 +8,7 @@ interface BaseButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md" | "lg"
   icon?: ReactNode
   children?: ReactNode
+  fullWidth?: boolean
 }
 
 export function BaseButton({
@@ -17,6 +18,7 @@ export function BaseButton({
   children,
   className,
   disabled,
+  fullWidth,
   ...props
 }: BaseButtonProps) {
   const baseStyles = "inline-flex items-center justify-center gap-2 font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -37,7 +39,7 @@ export function BaseButton({
 
   return (
     <button
-      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)}
+      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], fullWidth && "w-full", className)}
       disabled={disabled}
       {...props}
     >
