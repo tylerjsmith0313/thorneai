@@ -1,6 +1,7 @@
 import { streamText, convertToModelMessages, UIMessage } from "ai"
 import { createClient } from "@/lib/supabase/server"
-import { AGYNT_SYSTEM_INSTRUCTIONS, createAgyntTools, getUserAIContext } from "@/lib/ai/agynt-agent"
+import { AGYNT_SYSTEM_INSTRUCTIONS } from "@/lib/ai/agynt-constants"
+import { createAgyntTools, getUserAIContext } from "@/lib/ai/agynt-agent"
 
 export async function POST(req: Request) {
   try {
@@ -46,7 +47,7 @@ Tailor your responses to be specific to this contact. When suggesting outreach o
     }
 
     // Create tools for this user
-    const tools = createAgyntTools(user.id)
+    const tools = await createAgyntTools(user.id)
 
     // Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(messages)

@@ -26,7 +26,7 @@ export function ActivityTrackerModal({ onClose, onSave }: ActivityTrackerModalPr
 
   const handleSave = () => {
     onSave({
-      type,
+      type: selectedLabel,
       timestamp,
       result,
       investment: hasInvestment ? Number.parseFloat(amount) : 0

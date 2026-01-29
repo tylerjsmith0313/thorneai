@@ -15,7 +15,7 @@ export function AICommandChat() {
 
   const { messages, sendMessage, status, setMessages } = useChat({
     id: "ai-command-center",
-    transport: new DefaultChatTransport({ api: "/api/ai/chat" }),
+    api: "/api/ai/chat",
     initialMessages: [
       {
         id: "welcome",
