@@ -10,7 +10,7 @@ import {
   getContactActivities,
   createContactActivity,
   type ContactActivity,
-} from "@/lib/data-service"
+} from "@/lib/contact-activities"
 
 interface HistorySectionProps {
   contact: Contact
