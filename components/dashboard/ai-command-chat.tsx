@@ -13,14 +13,14 @@ export function AICommandChat() {
   const [inputValue, setInputValue] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, append, status, setMessages } = useChat({
     id: "ai-command-center",
-    transport: new DefaultChatTransport({ api: "/api/ai/chat" }),
+    api: "/api/ai/chat",
     initialMessages: [
       {
         id: "welcome",
         role: "assistant",
-        parts: [{ type: "text", text: "Hello! I'm AgyntSynq, your AI Success Development Manager. I can help you analyze your pipeline, draft outreach, schedule follow-ups, and strategize your sales approach. How can I assist you today?" }],
+        content: "Hello! I'm AgyntSynq, your AI Success Development Manager. I can help you analyze your pipeline, draft outreach, schedule follow-ups, and strategize your sales approach. How can I assist you today?",
       },
     ],
   })
@@ -32,28 +32,40 @@ export function AICommandChat() {
 
   const handleSend = useCallback(() => {
     if (!inputValue.trim() || status === "streaming") return
-    sendMessage({ text: inputValue })
+    append({ role: "user", content: inputValue })
     setInputValue("")
-  }, [inputValue, sendMessage, status])
+  }, [inputValue, append, status])
 
   const handleQuickAction = useCallback((prompt: string) => {
-    sendMessage({ text: prompt })
-  }, [sendMessage])
+    append({ role: "user", content: prompt })
+  }, [append])
 
   const getMessageText = (msg: typeof messages[0]) => {
-    if (!msg.parts || !Array.isArray(msg.parts)) return ""
-    return msg.parts
-      .filter((p): p is { type: "text"; text: string } => p.type === "text")
-      .map((p) => p.text)
-      .join("")
+    // AI SDK 6 uses content directly
+    if (typeof msg.content === "string") return msg.content
+    // Fallback for parts-based messages
+    if (msg.parts && Array.isArray(msg.parts)) {
+      return msg.parts
+        .filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join("")
+    }
+    return ""
   }
 
   // Check for tool calls in the message
   const getToolCalls = (msg: typeof messages[0]) => {
-    if (!msg.parts || !Array.isArray(msg.parts)) return []
-    return msg.parts.filter((p): p is { type: "tool-invocation"; toolInvocation: any } => 
-      p.type === "tool-invocation"
-    )
+    // AI SDK 6 uses toolInvocations array
+    if (msg.toolInvocations && Array.isArray(msg.toolInvocations)) {
+      return msg.toolInvocations
+    }
+    // Fallback for parts-based messages
+    if (msg.parts && Array.isArray(msg.parts)) {
+      return msg.parts.filter((p): p is { type: "tool-invocation"; toolInvocation: unknown } => 
+        p.type === "tool-invocation"
+      )
+    }
+    return []
   }
 
   return (
@@ -91,13 +103,13 @@ export function AICommandChat() {
                 {/* Tool calls indicator */}
                 {toolCalls.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {toolCalls.map((tc, i) => (
+                    {toolCalls.map((tc: { toolName?: string }, i: number) => (
                       <div 
                         key={i}
                         className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs"
                       >
                         <Zap size={10} />
-                        {formatToolName(tc.toolInvocation?.toolName || "tool")}
+                        {formatToolName(tc.toolName || "tool")}
                       </div>
                     ))}
                   </div>
