@@ -1094,3 +1094,6 @@ export async function getDashboardStats() {
     }
   }
 }
+
+// Re-export for explicit module boundary (force rebuild)
+export type { ContactActivity, ContactActivityType }
