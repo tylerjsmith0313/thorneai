@@ -435,6 +435,82 @@ export async function createActivity(activity: Omit<Activity, "id" | "date">): P
   return data ? transformActivity(data) : null
 }
 
+// CONTACT ACTIVITIES
+export interface ContactActivity {
+  id: string
+  contactId: string
+  type: 'email' | 'call' | 'meeting' | 'note' | 'task' | 'gift' | 'other'
+  title: string
+  description?: string
+  date: string
+  metadata?: Record<string, unknown>
+}
+
+export async function getContactActivities(contactId: string): Promise<ContactActivity[]> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from("activities")
+    .select("*")
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: false })
+    .limit(50)
+
+  if (error) {
+    console.error("[v0] Error fetching contact activities:", error)
+    return []
+  }
+
+  return (data || []).map((item) => ({
+    id: item.id,
+    contactId: item.contact_id,
+    type: item.type || 'other',
+    title: item.title || '',
+    description: item.detail || '',
+    date: item.created_at,
+    metadata: {}
+  }))
+}
+
+export async function createContactActivity(
+  activity: Omit<ContactActivity, 'id' | 'date'>
+): Promise<ContactActivity | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return null
+
+  const { data, error } = await supabase
+    .from("activities")
+    .insert({
+      user_id: user.id,
+      contact_id: activity.contactId,
+      type: activity.type,
+      title: activity.title,
+      detail: activity.description,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[v0] Error creating contact activity:", error)
+    return null
+  }
+
+  return data ? {
+    id: data.id,
+    contactId: data.contact_id,
+    type: data.type || 'other',
+    title: data.title || '',
+    description: data.detail || '',
+    date: data.created_at,
+    metadata: {}
+  } : null
+}
+
 // CALENDAR EVENTS
 export interface CalendarEvent {
   id: string
