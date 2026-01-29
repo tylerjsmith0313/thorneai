@@ -4,6 +4,8 @@ import { tool } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 
+// Force rebuild: 2026-01-29T09:00:00Z
+
 // AgyntSynq System Instructions - Comprehensive Sales AI Agent
 export const AGYNT_SYSTEM_INSTRUCTIONS = `You are AgyntSynq, an elite AI sales intelligence agent. You are the user's personal AI assistant for sales, marketing, customer service, and lead generation.
 
