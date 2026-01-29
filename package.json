@@ -1,6 +1,6 @@
 {
-  "name": "thorne-neural-core",
-  "version": "0.0.0",
+  "name": "agyntsynq-crm",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "next build",

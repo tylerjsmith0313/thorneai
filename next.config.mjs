@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-// Force cache invalidation: 2026-01-29
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -7,7 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
- 
+  // Clean build configuration
+  cleanDistDir: true,
 }
 
 export default nextConfig
