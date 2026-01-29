@@ -6,7 +6,7 @@ import type { Activity, Contact } from "@/types"
 import { HistoryDetailView } from "../history-detail-view"
 import { ActivityTrackerModal } from "../activity-tracker-modal"
 import { BaseButton } from "@/components/ui/base-button"
-import { getContactActivities, createContactActivity, type ContactActivity } from "@/lib/data-service"
+import { getContactActivities, createContactActivity, type ContactActivity } from "@/lib/contact-activities"
 
 interface HistorySectionProps {
   contact: Contact
