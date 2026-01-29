@@ -391,7 +391,10 @@ export async function createProduct(product: Omit<Product, "id">): Promise<Produ
   return data ? transformProduct(data) : null
 }
 
-// CONTACT ACTIVITIES
+// CONTACT ACTIVITIES - Activity tracking for individual contacts
+/**
+ * Represents an activity associated with a contact
+ */
 export interface ContactActivity {
   id: string
   contactId: string
@@ -425,6 +428,11 @@ function transformContactActivity(row: any): ContactActivity {
   }
 }
 
+/**
+ * Get all activities for a specific contact
+ * @param contactId - The contact's unique identifier
+ * @returns Array of activities for the contact
+ */
 export async function getContactActivities(contactId: string): Promise<ContactActivity[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -441,6 +449,11 @@ export async function getContactActivities(contactId: string): Promise<ContactAc
   return (data || []).map(transformContactActivity)
 }
 
+/**
+ * Create a new activity for a contact
+ * @param activity - The activity details to create
+ * @returns The created activity or null if failed
+ */
 export async function createContactActivity(activity: {
   contactId: string
   activityType: ContactActivity['activityType']
