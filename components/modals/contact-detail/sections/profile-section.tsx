@@ -1,9 +1,6 @@
 "use client"
 
-import React from "react"
-import ThorneInsightBox from "@/components/thorne-insight-box" // Import ThorneInsightBox
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { 
   Mail, Phone, Globe, Building2, MapPin, Linkedin, Twitter, Instagram, Facebook, Youtube, Share2,
   Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle, User, Users

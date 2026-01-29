@@ -20,7 +20,7 @@ export function CreativeConsultationModal({ onClose }: CreativeConsultationModal
     customInstructions: "",
   })
 
-  const productOptions = ["SaaS Platform License", "Enterprise Consulting", "Thorne Radar API", "Digital Integration Audit"]
+  const productOptions = ["SaaS Platform License", "Enterprise Consulting", "AgyntSynq API", "Digital Integration Audit"]
 
   const toggleProduct = (product: string) => {
     setFormData((prev) => ({

@@ -13,7 +13,7 @@ interface Contact {
 
 interface Message {
   id: string
-  sender: "thorne" | "contact"
+  sender: "agent" | "contact"
   text: string
   timestamp: string
   type: "email" | "sms" | "linkedin"
