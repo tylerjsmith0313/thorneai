@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 
+// Contact activity management for tracking interactions with contacts
+
 /**
  * Represents an activity associated with a contact
  */
