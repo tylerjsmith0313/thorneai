@@ -59,8 +59,21 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error("[v0] Mailgun error:", errorText)
-      return NextResponse.json({ error: "Failed to send email", details: errorText }, { status: 500 })
+      console.error("[v0] Mailgun error:", response.status, errorText)
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to send email"
+      if (response.status === 401) {
+        errorMessage = "Invalid Mailgun API key. Please check your credentials in Control Center > Integrations."
+      } else if (response.status === 403) {
+        errorMessage = "Mailgun domain not authorized. Please verify your domain in Mailgun dashboard."
+      } else if (response.status === 404) {
+        errorMessage = "Mailgun domain not found. Please check your domain configuration."
+      } else if (errorText.includes("sandbox")) {
+        errorMessage = "Sandbox domains can only send to authorized recipients. Please verify your domain in Mailgun."
+      }
+      
+      return NextResponse.json({ error: errorMessage, details: errorText }, { status: 500 })
     }
 
     const result = await response.json()

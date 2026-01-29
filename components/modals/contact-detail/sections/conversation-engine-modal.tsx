@@ -4,13 +4,11 @@ import { useState, useEffect } from "react"
 import { 
   Send, Zap, User, Sparkles, Settings, 
   Paperclip, FileText, Calendar, Gift,
-  Loader2, Activity, X, Phone, AlertCircle, CheckCircle
+  Loader2, Activity, X, Phone
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendEmail, sendTemplatedEmail, isEmailConfigured } from "@/lib/services/email-service"
 import { toast } from "sonner"
 import type { Contact } from "@/types"
-
 
 interface ConversationEngineModalProps {
   contact: Contact
@@ -32,14 +30,8 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [aiInsight, setAiInsight] = useState<string | null>(null)
-  const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null)
   
   const supabase = createClient()
-
-  // Check if email is configured
-  useEffect(() => {
-    isEmailConfigured().then(setEmailConfigured)
-  }, [])
 
   // Load email conversations for this contact only
   useEffect(() => {
@@ -110,26 +102,24 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
       return
     }
     
-    // Check if email is configured
-    if (!emailConfigured) {
-      toast.error("Email service not configured. Please set up Mailgun in Control Center > Integrations.")
-      return
-    }
-    
     setIsSending(true)
 
     try {
-      const result = await sendEmail({
-        to: contact.email,
-        subject: subject,
-        text: message,
-        contactId: contact.id,
-        trackOpens: true,
-        trackClicks: true,
-        tags: ["conversation-engine", "manual"]
+      // Use API route for email sending
+      const response = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: contact.email,
+          subject: subject,
+          text: message,
+          contactId: contact.id,
+        })
       })
       
-      if (result.success) {
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
         toast.success("Email sent successfully!")
         setMessages(prev => [...prev, {
           id: `msg-${Date.now()}`,
@@ -140,8 +130,9 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
         setMessage("")
         setSubject(`Follow up from AgyntSynq`)
       } else {
-        toast.error(result.error || "Failed to send email")
-        console.error("[v0] Failed to send email:", result.error)
+        const errorMessage = result.error || result.details || "Failed to send email"
+        toast.error(errorMessage)
+        console.error("[v0] Failed to send email:", errorMessage)
       }
     } catch (error) {
       console.error("[v0] Failed to send message:", error)
@@ -315,37 +306,37 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
               )}
             </div>
 
-{/* Input */}
-  <div className="p-4 border-t border-slate-100 bg-white space-y-3">
-  {/* Email Config Warning */}
-  {emailConfigured === false && (
-    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-      <AlertCircle size={14} className="text-amber-600 shrink-0" />
-      <p className="text-[10px] text-amber-800">Email not configured. Set up Mailgun in Control Center to send emails.</p>
-    </div>
-  )}
-  
-  {/* Subject Line */}
-  <div className="flex items-center gap-2">
-    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subject:</span>
-    <input
-      type="text"
-      value={subject}
-      onChange={(e) => setSubject(e.target.value)}
-      placeholder="Email subject..."
-      className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
-      disabled={isSending}
-    />
-  </div>
-  
-  <div className="bg-slate-50 rounded-xl p-3">
-  <textarea
-  value={message}
-  onChange={(e) => setMessage(e.target.value)}
-  placeholder={`Reply to ${contact.firstName}...`}
-  className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
-  disabled={isSending}
-  />
+            {/* Input */}
+            <div className="p-4 border-t border-slate-100 bg-white space-y-3">
+              {/* Email Config Warning */}
+              {!emailConfigured && (
+                <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                  <p className="text-[10px] text-amber-800">Email not configured. Set up Mailgun in Control Center to send emails.</p>
+                </div>
+              )}
+              
+              {/* Subject Line */}
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subject:</span>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Email subject..."
+                  className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+                  disabled={isSending}
+                />
+              </div>
+              
+              <div className="bg-slate-50 rounded-xl p-3">
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={`Reply to ${contact.firstName}...`}
+                  className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
+                  disabled={isSending}
+                />
                 <div className="flex items-center justify-between mt-2">
                   <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
                     <Paperclip size={14} />

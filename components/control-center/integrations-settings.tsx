@@ -502,6 +502,107 @@ export function IntegrationsSettings() {
           </div>
         </div>
       </div>
+
+      {/* Stripe Connect Integration */}
+      <StripeConnectCard />
+    </div>
+  )
+}
+
+function StripeConnectCard() {
+  const [stripeStatus, setStripeStatus] = useState<"not_connected" | "pending" | "connected">("not_connected")
+  const [connecting, setConnecting] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function checkStripeStatus() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: tenantData } = await supabase
+        .from("tenants")
+        .select("stripe_account_id, stripe_account_status")
+        .single()
+      
+      if (tenantData?.stripe_account_status) {
+        setStripeStatus(tenantData.stripe_account_status as "not_connected" | "pending" | "connected")
+      }
+    }
+    
+    checkStripeStatus()
+  }, [supabase])
+
+  async function handleConnectStripe() {
+    setConnecting(true)
+    try {
+      const response = await fetch("/api/stripe/connect", { method: "POST" })
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error("Failed to connect Stripe:", error)
+    }
+    setConnecting(false)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="p-5 border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">Stripe Connect</h3>
+              <p className="text-xs text-slate-500">Accept payments from proposals</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {stripeStatus === "connected" ? (
+              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                <Check size={12} /> Connected
+              </span>
+            ) : stripeStatus === "pending" ? (
+              <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                <Loader2 size={12} className="animate-spin" /> Pending
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <p className="text-sm text-slate-600 mb-4">
+          Link your Stripe account to automatically process payments from generated proposals and invoices.
+        </p>
+        
+        {stripeStatus === "connected" ? (
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <Check className="text-emerald-600" size={20} />
+            <div>
+              <p className="text-sm font-medium text-emerald-800">Stripe account connected</p>
+              <p className="text-xs text-emerald-600">Payments will be processed automatically</p>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleConnectStripe}
+            disabled={connecting}
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50"
+          >
+            {connecting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ExternalLink size={16} />
+            )}
+            {connecting ? "Connecting..." : "Connect Stripe Account"}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -85,26 +85,50 @@ export function SummarySection({ contact }: SummarySectionProps) {
     setIsEditing(false)
   }
 
-  const addInterest = () => {
+  // Helper to save contact data
+  const saveContactData = async (updates: Record<string, unknown>) => {
+    const { error } = await supabase
+      .from("contacts")
+      .update(updates)
+      .eq("id", contact.id)
+    
+    if (error) {
+      console.error("[v0] Error saving contact data:", error)
+    }
+  }
+
+  const addInterest = async () => {
     if (newInterest.trim() && !interests.includes(newInterest.trim())) {
-      setInterests([...interests, newInterest.trim()])
+      const newInterests = [...interests, newInterest.trim()]
+      setInterests(newInterests)
       setNewInterest("")
+      // Auto-save
+      await saveContactData({ interests: newInterests })
     }
   }
 
-  const removeInterest = (interest: string) => {
-    setInterests(interests.filter(i => i !== interest))
+  const removeInterest = async (interest: string) => {
+    const newInterests = interests.filter(i => i !== interest)
+    setInterests(newInterests)
+    // Auto-save
+    await saveContactData({ interests: newInterests })
   }
 
-  const addHobby = () => {
+  const addHobby = async () => {
     if (newHobby.trim() && !hobbies.includes(newHobby.trim())) {
-      setHobbies([...hobbies, newHobby.trim()])
+      const newHobbies = [...hobbies, newHobby.trim()]
+      setHobbies(newHobbies)
       setNewHobby("")
+      // Auto-save
+      await saveContactData({ hobbies: newHobbies })
     }
   }
 
-  const removeHobby = (hobby: string) => {
-    setHobbies(hobbies.filter(h => h !== hobby))
+  const removeHobby = async (hobby: string) => {
+    const newHobbies = hobbies.filter(h => h !== hobby)
+    setHobbies(newHobbies)
+    // Auto-save
+    await saveContactData({ hobbies: newHobbies })
   }
 
   if (loading) {
@@ -146,112 +170,93 @@ export function SummarySection({ contact }: SummarySectionProps) {
         )}
       </div>
 
-      {/* Interests */}
+      {/* Interests - Always show add input */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-indigo-500">
           <Heart size={16} />
           <h4 className="text-sm font-bold">Interests</h4>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {interests.length === 0 && !isEditing && (
-            <p className="text-sm text-slate-400 italic">No interests added yet</p>
-          )}
+        <div className="flex flex-wrap gap-2 items-center">
           {interests.map(interest => (
             <span 
               key={interest} 
-              className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold border border-indigo-100 flex items-center gap-1.5"
+              className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold border border-indigo-100 flex items-center gap-1.5 group"
             >
               {interest}
-              {isEditing && (
-                <button onClick={() => removeInterest(interest)} className="hover:text-indigo-800">
-                  <X size={12} />
-                </button>
-              )}
+              <button 
+                onClick={() => removeInterest(interest)} 
+                className="hover:text-indigo-800 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={12} />
+              </button>
             </span>
           ))}
-          {isEditing && (
-            <div className="flex items-center gap-2">
-              <Input
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                placeholder="Add interest..."
-                className="h-8 w-32 text-xs"
-                onKeyDown={(e) => e.key === "Enter" && addInterest()}
-              />
-              <Button size="sm" variant="outline" onClick={addInterest} className="h-8 px-2 bg-transparent">
-                <Plus size={14} />
-              </Button>
-            </div>
-          )}
+          {/* Always show add input */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newInterest}
+              onChange={(e) => setNewInterest(e.target.value)}
+              placeholder="Add interest..."
+              className="h-8 w-32 text-xs"
+              onKeyDown={(e) => e.key === "Enter" && addInterest()}
+            />
+            <Button size="sm" variant="outline" onClick={addInterest} className="h-8 px-2 bg-transparent">
+              <Plus size={14} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Hobbies */}
+      {/* Hobbies - Always show add input */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-rose-500">
           <Heart size={16} />
           <h4 className="text-sm font-bold">Hobbies</h4>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {hobbies.length === 0 && !isEditing && (
-            <p className="text-sm text-slate-400 italic">No hobbies added yet</p>
-          )}
+        <div className="flex flex-wrap gap-2 items-center">
           {hobbies.map(hobby => (
             <span 
               key={hobby} 
-              className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold border border-rose-100 flex items-center gap-1.5"
+              className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold border border-rose-100 flex items-center gap-1.5 group"
             >
               {hobby}
-              {isEditing && (
-                <button onClick={() => removeHobby(hobby)} className="hover:text-rose-800">
-                  <X size={12} />
-                </button>
-              )}
+              <button 
+                onClick={() => removeHobby(hobby)} 
+                className="hover:text-rose-800 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={12} />
+              </button>
             </span>
           ))}
-          {isEditing && (
-            <div className="flex items-center gap-2">
-              <Input
-                value={newHobby}
-                onChange={(e) => setNewHobby(e.target.value)}
-                placeholder="Add hobby..."
-                className="h-8 w-32 text-xs"
-                onKeyDown={(e) => e.key === "Enter" && addHobby()}
-              />
-              <Button size="sm" variant="outline" onClick={addHobby} className="h-8 px-2 bg-transparent">
-                <Plus size={14} />
-              </Button>
-            </div>
-          )}
+          {/* Always show add input */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newHobby}
+              onChange={(e) => setNewHobby(e.target.value)}
+              placeholder="Add hobby..."
+              className="h-8 w-32 text-xs"
+              onKeyDown={(e) => e.key === "Enter" && addHobby()}
+            />
+            <Button size="sm" variant="outline" onClick={addHobby} className="h-8 px-2 bg-transparent">
+              <Plus size={14} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Notes */}
+      {/* Notes - Editable textarea that auto-saves on blur */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-emerald-500">
           <FileText size={16} />
           <h4 className="text-sm font-bold">Notes</h4>
         </div>
-        {isEditing ? (
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder={`Add notes about ${contact.firstName}...`}
-            className="min-h-[120px]"
-          />
-        ) : (
-          <div className="p-6 bg-slate-50 rounded-[32px] border border-slate-200">
-            {notes ? (
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {notes}
-              </p>
-            ) : (
-              <p className="text-sm text-slate-400 italic">
-                No notes yet. Click Edit to add notes about {contact.firstName}.
-              </p>
-            )}
-          </div>
-        )}
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={() => saveContactData({ notes: notes || null })}
+          placeholder={`Add notes about ${contact.firstName}...`}
+          className="min-h-[120px] bg-slate-50 border-slate-200"
+        />
       </div>
 
       {/* Persona Attributes */}
