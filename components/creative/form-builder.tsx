@@ -40,8 +40,17 @@ export interface FormConfig {
 
 interface FormBuilderProps {
   formId?: string
-  config: FormConfig
+  initialConfig?: FormConfig | null
   onConfigChange: (config: FormConfig) => void
+}
+
+const DEFAULT_CONFIG: FormConfig = {
+  fields: [],
+  submitButtonText: "Submit",
+  successMessage: "Thank you for your submission!",
+  primaryColor: "#4f46e5",
+  backgroundColor: "#ffffff",
+  fontFamily: "Inter",
 }
 
 const FIELD_TYPES = [
@@ -54,10 +63,17 @@ const FIELD_TYPES = [
   { id: "select", label: "Dropdown", icon: ChevronDown },
 ] as const
 
-export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps) {
+export function FormBuilder({ formId, initialConfig, onConfigChange }: FormBuilderProps) {
+  const [config, setConfig] = useState<FormConfig>(initialConfig || DEFAULT_CONFIG)
   const [activeTab, setActiveTab] = useState<"build" | "style" | "embed">("build")
   const [copied, setCopied] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
+
+  // Sync config changes with parent
+  const updateConfig = (newConfig: FormConfig) => {
+    setConfig(newConfig)
+    onConfigChange(newConfig)
+  }
 
   const addField = (type: FormField["type"]) => {
     const newField: FormField = {
@@ -68,21 +84,21 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
       required: false,
       options: type === "radio" || type === "select" || type === "checkbox" ? ["Option 1", "Option 2"] : undefined,
     }
-    onConfigChange({
+    updateConfig({
       ...config,
       fields: [...config.fields, newField],
     })
   }
 
   const updateField = (id: string, updates: Partial<FormField>) => {
-    onConfigChange({
+    updateConfig({
       ...config,
       fields: config.fields.map((f) => (f.id === id ? { ...f, ...updates } : f)),
     })
   }
 
   const removeField = (id: string) => {
-    onConfigChange({
+    updateConfig({
       ...config,
       fields: config.fields.filter((f) => f.id !== id),
     })
@@ -92,7 +108,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
     const newFields = [...config.fields]
     const [removed] = newFields.splice(fromIndex, 1)
     newFields.splice(toIndex, 0, removed)
-    onConfigChange({ ...config, fields: newFields })
+    updateConfig({ ...config, fields: newFields })
   }
 
   const generateEmbedCode = () => {
@@ -276,7 +292,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
                 <input
                   type="text"
                   value={config.submitButtonText}
-                  onChange={(e) => onConfigChange({ ...config, submitButtonText: e.target.value })}
+                  onChange={(e) => updateConfig({ ...config, submitButtonText: e.target.value })}
                   className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl"
                   placeholder="Submit"
                 />
@@ -289,7 +305,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
                 </h5>
                 <textarea
                   value={config.successMessage}
-                  onChange={(e) => onConfigChange({ ...config, successMessage: e.target.value })}
+                  onChange={(e) => updateConfig({ ...config, successMessage: e.target.value })}
                   className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl resize-none"
                   rows={2}
                   placeholder="Thank you for submitting!"
@@ -307,7 +323,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
                 <input
                   type="color"
                   value={config.primaryColor}
-                  onChange={(e) => onConfigChange({ ...config, primaryColor: e.target.value })}
+                  onChange={(e) => updateConfig({ ...config, primaryColor: e.target.value })}
                   className="w-full h-10 rounded-xl cursor-pointer"
                 />
               </div>
@@ -319,7 +335,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
                 <input
                   type="color"
                   value={config.backgroundColor}
-                  onChange={(e) => onConfigChange({ ...config, backgroundColor: e.target.value })}
+                  onChange={(e) => updateConfig({ ...config, backgroundColor: e.target.value })}
                   className="w-full h-10 rounded-xl cursor-pointer"
                 />
               </div>
@@ -330,7 +346,7 @@ export function FormBuilder({ formId, config, onConfigChange }: FormBuilderProps
                 </h5>
                 <select
                   value={config.fontFamily}
-                  onChange={(e) => onConfigChange({ ...config, fontFamily: e.target.value })}
+                  onChange={(e) => updateConfig({ ...config, fontFamily: e.target.value })}
                   className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl"
                 >
                   <option value="Inter">Inter</option>
