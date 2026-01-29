@@ -57,16 +57,79 @@ async function parseMailgunPayload(request: NextRequest) {
   }
 }
 
+// Handle tracking events (opens, clicks, bounces, complaints, etc.)
+async function handleTrackingEvent(payload: Record<string, string>) {
+  const eventType = payload.event || payload["event-data"]?.event
+  const messageId = payload["Message-Id"] || payload["message-id"] || payload.messageId || payload["event-data"]?.message?.headers?.["message-id"]
+  const recipient = payload.recipient || payload["event-data"]?.recipient
+  
+  if (!eventType) {
+    console.log("[v0] No event type in tracking payload")
+    return { success: false, message: "No event type" }
+  }
+
+  console.log(`[v0] Processing ${eventType} event for ${recipient}`)
+
+  // Find the email message by message_id
+  const { data: email } = await supabase
+    .from("email_messages")
+    .select("id, contact_id, tenant_id")
+    .eq("message_id", messageId)
+    .single()
+
+  // Update email status based on event type
+  const statusMap: Record<string, string> = {
+    delivered: "delivered",
+    opened: "opened",
+    clicked: "clicked",
+    bounced: "bounced",
+    complained: "complained",
+    unsubscribed: "unsubscribed",
+    failed: "failed",
+    rejected: "rejected",
+  }
+
+  const newStatus = statusMap[eventType]
+  
+  if (email && newStatus) {
+    await supabase
+      .from("email_messages")
+      .update({
+        status: newStatus,
+        [`${eventType}_at`]: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", email.id)
+
+    // Create conversation event for tracking
+    if (email.contact_id) {
+      await supabase.from("conversation_events").insert({
+        contact_id: email.contact_id,
+        tenant_id: email.tenant_id,
+        event_type: `email_${eventType}`,
+        event_data: {
+          email_id: email.id,
+          recipient,
+          timestamp: new Date().toISOString(),
+          url: eventType === "clicked" ? payload.url || payload["event-data"]?.url : undefined,
+        },
+      })
+    }
+  }
+
+  return { success: true, event: eventType, emailId: email?.id }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const payload = await parseMailgunPayload(request)
 
     // Verify webhook signature if credentials are available
-    const timestamp = payload.timestamp || payload["signature[timestamp]"]
-    const token = payload.token || payload["signature[token]"]
-    const signature = payload.signature || payload["signature[signature]"]
+    const timestamp = payload.timestamp || payload["signature[timestamp]"] || payload["signature"]?.timestamp
+    const token = payload.token || payload["signature[token]"] || payload["signature"]?.token
+    const signature = payload.signature || payload["signature[signature]"] || payload["signature"]?.signature
 
-    if (timestamp && token && signature) {
+    if (timestamp && token && signature && typeof signature === "string") {
       const isValid = verifyMailgunSignature(timestamp, token, signature)
       if (!isValid) {
         console.error("[v0] Invalid Mailgun webhook signature")
@@ -74,6 +137,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if this is a tracking event (delivered, opened, clicked, bounced, etc.)
+    const eventType = payload.event || payload["event-data"]?.event
+    if (eventType && ["delivered", "opened", "clicked", "bounced", "complained", "unsubscribed", "failed", "rejected", "stored"].includes(eventType)) {
+      const result = await handleTrackingEvent(payload)
+      return NextResponse.json(result)
+    }
+
+    // Otherwise, this is an inbound email
     // Extract email data
     const emailData = {
       messageId: payload["Message-Id"] || payload["message-id"] || payload.messageId,

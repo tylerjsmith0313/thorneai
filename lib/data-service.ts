@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Contact, Deal, Conversation, Product, KnowledgeSource, Activity, UserSettings } from "@/types"
 
+// Data Service - Central data access layer for AgyntOS
 // Transform database row (snake_case) to frontend type (camelCase)
 function transformContact(row: any): Contact {
   return {
