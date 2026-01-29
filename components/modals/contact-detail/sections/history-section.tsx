@@ -1,13 +1,101 @@
 "use client"
 
-// History section component for displaying contact activity timeline
 import { useState, useEffect, useCallback } from "react"
-import { Gift, Phone, Mail, MessageSquare, History, Edit3, User, Building2, Eye, PlusCircle, ChevronRight, Loader2, Calendar, Video, Clock } from "lucide-react"
+import { Gift, Phone, Mail, MessageSquare, History, Edit3, User, Eye, PlusCircle, ChevronRight, Loader2, Calendar, Video, Clock } from "lucide-react"
 import type { Activity, Contact } from "@/types"
 import { HistoryDetailView } from "../history-detail-view"
 import { ActivityTrackerModal } from "../activity-tracker-modal"
 import { BaseButton } from "@/components/ui/base-button"
-import { getContactActivities, createContactActivity, type ContactActivity } from "@/lib/contact-activities"
+import { createClient } from "@/lib/supabase/client"
+
+// Contact Activity types - defined locally to avoid module resolution issues
+interface ContactActivity {
+  id: string
+  contactId: string
+  activityType: 'call' | 'email' | 'meeting' | 'zoom' | 'sms' | 'note' | 'gift' | 'task' | 'status_change' | 'profile_update'
+  title: string
+  description?: string
+  outcome?: string
+  performedAt?: string
+  metadata?: {
+    oldValue?: string
+    newValue?: string
+    [key: string]: any
+  }
+  createdAt?: string
+}
+
+function transformContactActivity(row: any): ContactActivity {
+  return {
+    id: row.id,
+    contactId: row.contact_id,
+    activityType: row.type,
+    title: row.title,
+    description: row.detail,
+    outcome: row.new_value,
+    performedAt: row.created_at,
+    metadata: {
+      oldValue: row.old_value,
+      newValue: row.new_value,
+    },
+    createdAt: row.created_at,
+  }
+}
+
+async function getContactActivities(contactId: string): Promise<ContactActivity[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("activities")
+    .select("*")
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[v0] Error fetching contact activities:", error)
+    return []
+  }
+
+  return (data || []).map(transformContactActivity)
+}
+
+async function createContactActivity(activity: {
+  contactId: string
+  activityType: ContactActivity['activityType']
+  title: string
+  description?: string
+  outcome?: string
+  performedAt?: string
+  metadata?: ContactActivity['metadata']
+}): Promise<ContactActivity | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    console.error("[v0] No authenticated user")
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from("activities")
+    .insert({
+      user_id: user.id,
+      contact_id: activity.contactId,
+      type: activity.activityType,
+      title: activity.title,
+      detail: activity.description,
+      old_value: activity.metadata?.oldValue,
+      new_value: activity.outcome || activity.metadata?.newValue,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[v0] Error creating contact activity:", error)
+    return null
+  }
+
+  return data ? transformContactActivity(data) : null
+}
 
 interface HistorySectionProps {
   contact: Contact
@@ -31,10 +119,9 @@ export function HistorySection({ contact }: HistorySectionProps) {
   }, [loadActivities])
 
   const handleAddActivity = async (newAct: { type: string; timestamp: string; result: string }) => {
-    // Create activity in database
     await createContactActivity({
       contactId: contact.id,
-      activityType: newAct.type.toLowerCase().replace(/ /g, "_") as any,
+      activityType: newAct.type.toLowerCase().replace(/ /g, "_") as ContactActivity['activityType'],
       title: `${newAct.type} Logged`,
       description: newAct.result,
       performedAt: new Date(newAct.timestamp).toISOString(),
@@ -43,7 +130,6 @@ export function HistorySection({ contact }: HistorySectionProps) {
     loadActivities()
   }
 
-  // Transform ContactActivity to Activity for the detail view
   const transformToActivity = (ca: ContactActivity): Activity => ({
     id: ca.id,
     type: ca.activityType,
