@@ -335,7 +335,7 @@ export async function GET(request: Request) {
           <button type="submit" id="thorne-widget-send">\${sendIcon}</button>
         </form>
       </div>
-      <div class="thorne-powered">Powered by <a href="${baseUrl}" target="_blank">Thorne AI</a></div>
+      <div class="thorne-powered">Powered by <a href="https://www.simplyflourish.space" target="_blank">Flourish Agency Systems</a></div>
     \`;
     container.appendChild(panel);
 
