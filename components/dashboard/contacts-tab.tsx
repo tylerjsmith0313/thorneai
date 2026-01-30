@@ -75,6 +75,8 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
 
     try {
       const sourceIds = Array.from(selectedForMerge).filter(id => id !== targetContactId)
+      console.log("[v0] Merging contacts:", { targetContactId, sourceIds })
+      
       const res = await fetch("/api/contacts/merge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,14 +86,19 @@ export function ContactsTab({ contacts }: ContactsTabProps) {
         }),
       })
 
+      const data = await res.json()
+      console.log("[v0] Merge response:", { status: res.status, data })
+
       if (res.ok) {
         // Refresh page to show updated contacts
         window.location.reload()
       } else {
-        console.error("Merge failed")
+        console.error("[v0] Merge failed:", data.error || data)
+        alert(`Merge failed: ${data.error || "Unknown error"}`)
       }
     } catch (error) {
-      console.error("Merge error:", error)
+      console.error("[v0] Merge error:", error)
+      alert(`Merge error: ${error}`)
     } finally {
       setMerging(false)
     }
