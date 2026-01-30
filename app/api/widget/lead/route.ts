@@ -27,13 +27,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Chatbot not found" }, { status: 404 })
     }
 
+    // Build the full name from firstName/lastName if provided
+    const fullName = visitorInfo.firstName && visitorInfo.lastName 
+      ? `${visitorInfo.firstName} ${visitorInfo.lastName}`.trim()
+      : visitorInfo.name || ''
+
     // Check if we already have a session
     if (sessionId) {
       // Update existing session with lead info
       const { error: updateError } = await supabaseAdmin
         .from("widget_sessions")
         .update({
-          visitor_name: visitorInfo.name,
+          visitor_name: fullName,
           visitor_email: visitorInfo.email,
           visitor_phone: visitorInfo.phone,
           opt_in_email: visitorInfo.optInEmail,
@@ -62,7 +67,7 @@ export async function POST(request: Request) {
         chatbot_id: chatbotId,
         user_id: chatbot.user_id,
         visitor_id: visitorId,
-        visitor_name: visitorInfo.name,
+        visitor_name: fullName,
         visitor_email: visitorInfo.email,
         visitor_phone: visitorInfo.phone,
         opt_in_email: visitorInfo.optInEmail,
@@ -105,23 +110,44 @@ async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId:
     if (existingContacts && existingContacts.length > 0) {
       // Use the first matching contact
       contactId = existingContacts[0].id
+      const existing = existingContacts[0]
 
       // Update existing contact with new info (merge data)
       const updateData: Record<string, any> = {
-        opt_in_email: visitorInfo.optInEmail,
-        opt_in_sms: visitorInfo.optInSms,
-        opt_in_phone: visitorInfo.optInPhone,
+        last_contact_date: new Date().toISOString(),
       }
       
-      // Only update phone if the existing one is empty
-      if (!existingContacts[0].phone && visitorInfo.phone) {
+      // Update opt-ins if they're true (don't overwrite existing true with false)
+      if (visitorInfo.optInEmail) updateData.opt_in_email = true
+      if (visitorInfo.optInSms) updateData.opt_in_sms = true
+      if (visitorInfo.optInPhone) updateData.opt_in_phone = true
+      
+      // Only update empty fields
+      if (!existing.phone && visitorInfo.phone) {
         updateData.phone = visitorInfo.phone
+      }
+      if (!existing.first_name && firstName) {
+        updateData.first_name = firstName
+      }
+      if (!existing.last_name && lastName) {
+        updateData.last_name = lastName
       }
 
       await supabaseAdmin
         .from("contacts")
         .update(updateData)
         .eq("id", contactId)
+
+      // Log activity for chat interaction
+      await supabaseAdmin
+        .from("activities")
+        .insert({
+          user_id: userId,
+          contact_id: contactId,
+          type: "System",
+          title: "Chat Widget Interaction",
+          detail: `Contact started a chat conversation`,
+        })
 
       // If there are multiple contacts with same email, log it for potential merge
       if (existingContacts.length > 1) {
@@ -148,32 +174,60 @@ async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId:
           .from("contacts")
           .update({
             email: visitorInfo.email,
-            phone: visitorInfo.phone,
+            phone: visitorInfo.phone || nameMatches[0].phone,
             opt_in_email: visitorInfo.optInEmail,
             opt_in_sms: visitorInfo.optInSms,
             opt_in_phone: visitorInfo.optInPhone,
+            last_contact_date: new Date().toISOString(),
           })
           .eq("id", contactId)
+
+        // Log activity
+        await supabaseAdmin
+          .from("activities")
+          .insert({
+            user_id: userId,
+            contact_id: contactId,
+            type: "System",
+            title: "Contact Updated via Chat",
+            detail: `Email and details added from chat widget`,
+          })
       } else {
         // Create a new contact
         const { data: newContact } = await supabaseAdmin
           .from("contacts")
           .insert({
             user_id: userId,
-            first_name: firstName,
-            last_name: lastName,
+            first_name: firstName || "Unknown",
+            last_name: lastName || "",
             email: visitorInfo.email,
             phone: visitorInfo.phone,
-            source: "widget",
-            status: "lead",
+            company: "",
+            source: "Chat Widget",
+            status: "New",
             opt_in_email: visitorInfo.optInEmail,
             opt_in_sms: visitorInfo.optInSms,
             opt_in_phone: visitorInfo.optInPhone,
+            added_date: new Date().toISOString().split("T")[0],
+            last_contact_date: new Date().toISOString(),
           })
           .select("id")
           .single()
 
         contactId = newContact?.id || null
+
+        // Log activity for new contact
+        if (contactId) {
+          await supabaseAdmin
+            .from("activities")
+            .insert({
+              user_id: userId,
+              contact_id: contactId,
+              type: "System",
+              title: "New Contact from Chat",
+              detail: `Lead captured via chat widget`,
+            })
+        }
       }
     }
 
