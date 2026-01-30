@@ -419,3 +419,44 @@ export type UserSettingsInsert = Database['public']['Tables']['user_settings']['
 export type UserSettingsUpdate = Database['public']['Tables']['user_settings']['Update']
 export type OutreachPersonality = Database['public']['Enums']['outreach_personality']
 export type AutomationMode = Database['public']['Enums']['automation_mode']
+
+// Widget Chat Types
+export interface WidgetChatbot {
+  id: string
+  user_id: string
+  name: string
+  welcome_message: string
+  ai_instructions: string | null
+  theme_color: string
+  embed_key: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface WidgetSession {
+  id: string
+  chatbot_id: string
+  user_id: string
+  contact_id: string | null
+  visitor_name: string | null
+  visitor_email: string | null
+  source_url: string | null
+  ip_address: string | null
+  user_agent: string | null
+  status: 'active' | 'closed'
+  unread_count: number
+  last_message_at: string
+  created_at: string
+}
+
+export interface WidgetMessage {
+  id: string
+  session_id: string
+  chatbot_id: string
+  user_id: string
+  sender_type: 'visitor' | 'agent' | 'ai'
+  content: string
+  is_read: boolean
+  created_at: string
+}

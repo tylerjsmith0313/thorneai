@@ -5,16 +5,20 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { 
   Send, Sparkles, Bot, User as UserIcon, 
-  Loader2, ExternalLink, Zap
+  Loader2, ExternalLink, Zap, MessageCircle
 } from "lucide-react"
 import type { Contact } from "@/types"
 import { ConversationEngineModal } from "./conversation-engine-modal"
+import { WidgetChatPanel } from "./widget-chat-panel"
 
 interface ChatSectionProps {
   contact: Contact
 }
 
+type ChatTab = "assistant" | "widget"
+
 export function ChatSection({ contact }: ChatSectionProps) {
+  const [activeTab, setActiveTab] = useState<ChatTab>("assistant")
   const [inputValue, setInputValue] = useState("")
   const [showConversationEngine, setShowConversationEngine] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -93,6 +97,39 @@ export function ChatSection({ contact }: ChatSectionProps) {
 
   return (
     <>
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => setActiveTab("assistant")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "assistant"
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Sparkles size={16} />
+          AI Assistant
+        </button>
+        <button
+          onClick={() => setActiveTab("widget")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "widget"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <MessageCircle size={16} />
+          Website Chats
+        </button>
+      </div>
+
+      {/* Widget Chat Panel */}
+      {activeTab === "widget" && (
+        <WidgetChatPanel contact={contact} />
+      )}
+
+      {/* AI Assistant Panel */}
+      {activeTab === "assistant" && (
       <div className="flex flex-col h-[500px] bg-white rounded-[32px] border border-slate-200 overflow-hidden animate-in fade-in duration-300">
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
@@ -234,6 +271,7 @@ export function ChatSection({ contact }: ChatSectionProps) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Conversation Engine Modal */}
       {showConversationEngine && (
