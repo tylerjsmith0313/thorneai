@@ -31,12 +31,14 @@ import {
   ClipboardCopy,
   Check,
   MessageSquare,
+  MousePointer2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { FormBuilder, type FormConfig } from "./form-builder"
 import { ChatWidgetBuilder, type ChatWidgetConfig } from "./chat-widget-builder"
+import { ChatButtonBuilder, type ChatButtonConfig } from "./chat-button-builder"
 
-type ProjectType = "form" | "chat_widget" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
+type ProjectType = "form" | "chat_widget" | "chat_button" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
 
 interface CanvasElement {
   id: string
