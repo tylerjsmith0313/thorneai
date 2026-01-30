@@ -51,9 +51,8 @@ export async function createClient(): Promise<any> {
 
   const cookieStore = await cookies()
   
-  // Only require @supabase/ssr when actually needed
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createServerClient } = require('@supabase/ssr')
+  // Dynamic import - only loads @supabase/ssr when actually needed
+  const { createServerClient } = await import('@supabase/ssr')
 
   return createServerClient(url, key, {
       cookies: {

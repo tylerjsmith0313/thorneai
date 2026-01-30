@@ -63,14 +63,30 @@ export function createClient() {
     return mockClient
   }
 
-  if (!client) {
-    // Only require @supabase/ssr when actually needed
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createBrowserClient } = require('@supabase/ssr')
-    client = createBrowserClient(url, key)
-  }
+  return client ?? mockClient
+}
 
-  return client
+// Async version that loads real Supabase client
+let initPromise: Promise<void> | null = null
+
+async function initClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  if (!url || !key || client) return
+  
+  const { createBrowserClient } = await import('@supabase/ssr')
+  client = createBrowserClient(url, key)
+}
+
+// Initialize on first import if configured
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  initPromise = initClient()
+}
+
+export async function getClient() {
+  if (initPromise) await initPromise
+  return createClient()
 }
 
 export function isSupabaseConfigured() {
