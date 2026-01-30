@@ -95,8 +95,13 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResult> {
       params.tags.forEach(tag => formData.append("o:tag", tag))
     }
 
+    // Determine the correct API endpoint based on domain region
+    // EU domains use api.eu.mailgun.net, US domains use api.mailgun.net
+    const isEUDomain = config.domain.endsWith('.eu') || process.env.MAILGUN_REGION === 'eu'
+    const apiBase = isEUDomain ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net'
+    
     const response = await fetch(
-      `https://api.mailgun.net/v3/${config.domain}/messages`,
+      `${apiBase}/v3/${config.domain}/messages`,
       {
         method: "POST",
         headers: {
@@ -107,9 +112,34 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResult> {
     )
 
     if (!response.ok) {
-      const error = await response.text()
-      console.error("[v0] Mailgun send failed:", error)
-      return { success: false, error: `Failed to send email: ${error}` }
+      const errorText = await response.text()
+      let errorMessage = errorText
+      
+      // Try to parse JSON error response
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.message || errorJson.error || errorText
+      } catch {
+        // Keep original text
+      }
+      
+      // Provide helpful error messages based on status code
+      if (response.status === 401) {
+        console.error("[v0] Mailgun auth failed: Invalid API key")
+        return { success: false, error: "Invalid Mailgun API key. Please check your credentials in Integrations." }
+      } else if (response.status === 403) {
+        console.error("[v0] Mailgun forbidden:", errorMessage)
+        return { 
+          success: false, 
+          error: `Mailgun access denied. This usually means: 1) The domain "${config.domain}" is not verified, 2) The API key doesn't have permission for this domain, or 3) You're using a sandbox domain without adding authorized recipients. Error: ${errorMessage}` 
+        }
+      } else if (response.status === 404) {
+        console.error("[v0] Mailgun domain not found:", config.domain)
+        return { success: false, error: `Mailgun domain "${config.domain}" not found. Please verify your domain is set up correctly.` }
+      }
+      
+      console.error("[v0] Mailgun send failed:", response.status, errorMessage)
+      return { success: false, error: `Failed to send email: ${errorMessage}` }
     }
 
     const data = await response.json()
@@ -329,8 +359,12 @@ export async function replyToEmail(params: {
     formData.append("o:tracking-opens", "yes")
     formData.append("o:tracking-clicks", "yes")
 
+    // Determine the correct API endpoint based on domain region
+    const isEUDomain = config.domain.endsWith('.eu') || process.env.MAILGUN_REGION === 'eu'
+    const apiBase = isEUDomain ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net'
+
     const response = await fetch(
-      `https://api.mailgun.net/v3/${config.domain}/messages`,
+      `${apiBase}/v3/${config.domain}/messages`,
       {
         method: "POST",
         headers: {
@@ -341,9 +375,17 @@ export async function replyToEmail(params: {
     )
 
     if (!response.ok) {
-      const error = await response.text()
-      console.error("[v0] Mailgun reply failed:", error)
-      return { success: false, error: `Failed to send reply: ${error}` }
+      const errorText = await response.text()
+      let errorMessage = errorText
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.message || errorJson.error || errorText
+      } catch {
+        // Keep original text
+      }
+      
+      console.error("[v0] Mailgun reply failed:", response.status, errorMessage)
+      return { success: false, error: `Failed to send reply (${response.status}): ${errorMessage}` }
     }
 
     const data = await response.json()
