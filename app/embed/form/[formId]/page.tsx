@@ -26,17 +26,15 @@ export default async function EmbedFormPage({
   const formConfig = form.canvas_data || form.metadata?.formConfig || null
 
   return (
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <style>{`
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: ${formConfig?.fontFamily || 'Inter'}, system-ui, sans-serif; }
-        `}</style>
-      </head>
-      <body>
-        <EmbeddableForm formId={formId} config={formConfig} />
-      </body>
-    </html>
+    <div 
+      style={{ 
+        margin: 0, 
+        padding: 0, 
+        fontFamily: `${formConfig?.fontFamily || 'Inter'}, system-ui, sans-serif`,
+        minHeight: '100%',
+      }}
+    >
+      <EmbeddableForm formId={formId} config={formConfig} />
+    </div>
   )
 }
