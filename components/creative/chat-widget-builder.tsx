@@ -256,48 +256,37 @@ export function ChatWidgetBuilder({ widgetId, initialConfig, onConfigChange }: C
                 </p>
               </div>
 
-              {/* Lead Capture Fields */}
+              {/* Lead Capture Fields - Always Required */}
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">
                   Lead Capture Form
                 </label>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={config.collectName}
-                      onChange={(e) => updateConfig({ ...config, collectName: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Collect Name</span>
-                      <p className="text-[10px] text-slate-400">Ask for visitor's first name</p>
+                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                  <p className="text-xs text-indigo-700 mb-3">
+                    The chat widget always requires visitors to provide their contact info before chatting.
+                  </p>
+                  <div className="space-y-2 text-xs text-indigo-600">
+                    <div className="flex items-center gap-2">
+                      <Check size={12} />
+                      <span>First Name (required)</span>
                     </div>
-                  </label>
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={config.collectEmail}
-                      onChange={(e) => updateConfig({ ...config, collectEmail: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Collect Email</span>
-                      <p className="text-[10px] text-slate-400">Ask for company email address</p>
+                    <div className="flex items-center gap-2">
+                      <Check size={12} />
+                      <span>Last Name (required)</span>
                     </div>
-                  </label>
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={config.collectPhone}
-                      onChange={(e) => updateConfig({ ...config, collectPhone: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Collect Phone</span>
-                      <p className="text-[10px] text-slate-400">Ask for cell phone number</p>
+                    <div className="flex items-center gap-2">
+                      <Check size={12} />
+                      <span>Email Address (required)</span>
                     </div>
-                  </label>
+                    <div className="flex items-center gap-2">
+                      <Check size={12} />
+                      <span>Cell Phone (required)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={12} />
+                      <span>Opt-in for Email, SMS, Phone (at least one required)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -413,37 +402,58 @@ export function ChatWidgetBuilder({ widgetId, initialConfig, onConfigChange }: C
                   </div>
                 </div>
 
-                {/* Messages */}
-                <div className="h-48 p-4 bg-slate-50 overflow-y-auto">
-                  <div className="flex gap-2">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs shrink-0"
-                      style={{ backgroundColor: config.themeColor }}
-                    >
-                      <MessageSquare size={14} />
+                {/* Lead Capture Form Preview */}
+                <div className="h-64 p-4 bg-slate-50 overflow-y-auto">
+                  <div className="text-center mb-3">
+                    <p className="text-sm font-semibold text-slate-700">Let's get started!</p>
+                    <p className="text-[10px] text-slate-500">Please share your details to begin chatting.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">First Name *</label>
+                      <input className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white" placeholder="John" disabled />
                     </div>
-                    <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2 shadow-sm max-w-[80%]">
-                      <p className="text-sm text-slate-700">{config.welcomeMessage}</p>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Last Name *</label>
+                      <input className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white" placeholder="Doe" disabled />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Email *</label>
+                      <input className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white" placeholder="john@company.com" disabled />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase">Cell Phone *</label>
+                      <input className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white" placeholder="(555) 123-4567" disabled />
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-slate-200">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Communication Preferences *</p>
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-[10px] text-slate-600">
+                          <input type="checkbox" className="w-3 h-3" disabled />
+                          I agree to receive emails
+                        </label>
+                        <label className="flex items-center gap-2 text-[10px] text-slate-600">
+                          <input type="checkbox" className="w-3 h-3" disabled />
+                          I agree to receive text messages
+                        </label>
+                        <label className="flex items-center gap-2 text-[10px] text-slate-600">
+                          <input type="checkbox" className="w-3 h-3" disabled />
+                          I agree to receive phone calls
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Input */}
+                {/* Start Chat Button */}
                 <div className="p-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder={config.placeholderText}
-                      className="flex-1 px-4 py-2.5 bg-slate-100 rounded-full text-sm outline-none"
-                      disabled
-                    />
-                    <button
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-                      style={{ backgroundColor: config.themeColor }}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
+                  <button
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold text-white"
+                    style={{ backgroundColor: config.themeColor }}
+                    disabled
+                  >
+                    Start Chat
+                  </button>
                 </div>
 
                 {/* Powered By */}

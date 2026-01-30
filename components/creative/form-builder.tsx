@@ -27,6 +27,7 @@ export interface FormField {
   placeholder?: string
   required: boolean
   options?: string[] // For radio/select/checkbox
+  isSystemField?: boolean // System fields cannot be deleted
 }
 
 export interface FormConfig {
@@ -44,8 +45,68 @@ interface FormBuilderProps {
   onConfigChange: (config: FormConfig) => void
 }
 
+// Default required fields that every form must have
+const REQUIRED_CONTACT_FIELDS: FormField[] = [
+  {
+    id: "default-first-name",
+    type: "text",
+    label: "First Name",
+    placeholder: "Enter your first name",
+    required: true,
+    isSystemField: true,
+  },
+  {
+    id: "default-last-name",
+    type: "text",
+    label: "Last Name",
+    placeholder: "Enter your last name",
+    required: true,
+    isSystemField: true,
+  },
+  {
+    id: "default-email",
+    type: "email",
+    label: "Email",
+    placeholder: "you@company.com",
+    required: true,
+    isSystemField: true,
+  },
+  {
+    id: "default-phone",
+    type: "phone",
+    label: "Cell Phone",
+    placeholder: "(555) 123-4567",
+    required: true,
+    isSystemField: true,
+  },
+]
+
+const DEFAULT_OPTIN_FIELDS: FormField[] = [
+  {
+    id: "default-opt-email",
+    type: "checkbox",
+    label: "I agree to receive emails",
+    required: true,
+    isSystemField: true,
+  },
+  {
+    id: "default-opt-sms",
+    type: "checkbox",
+    label: "I agree to receive text messages (data rates may apply)",
+    required: true,
+    isSystemField: true,
+  },
+  {
+    id: "default-opt-phone",
+    type: "checkbox",
+    label: "I agree to receive phone calls",
+    required: true,
+    isSystemField: true,
+  },
+]
+
 const DEFAULT_CONFIG: FormConfig = {
-  fields: [],
+  fields: [...REQUIRED_CONTACT_FIELDS, ...DEFAULT_OPTIN_FIELDS],
   submitButtonText: "Submit",
   successMessage: "Thank you for your submission!",
   primaryColor: "#4f46e5",
@@ -98,6 +159,12 @@ export function FormBuilder({ formId, initialConfig, onConfigChange }: FormBuild
   }
 
   const removeField = (id: string) => {
+    const field = config.fields.find((f) => f.id === id)
+    // Prevent deletion of system fields
+    if (field?.isSystemField) {
+      toast.error("This field is required and cannot be removed")
+      return
+    }
     updateConfig({
       ...config,
       fields: config.fields.filter((f) => f.id !== id),
@@ -199,34 +266,49 @@ export function FormBuilder({ formId, initialConfig, onConfigChange }: FormBuild
                     config.fields.map((field, index) => (
                       <div
                         key={field.id}
-                        className="bg-white border border-slate-200 rounded-xl p-3 space-y-3"
+                        className={`bg-white border rounded-xl p-3 space-y-3 ${
+                          field.isSystemField ? "border-indigo-200 bg-indigo-50/30" : "border-slate-200"
+                        }`}
                       >
                         <div className="flex items-center gap-2">
-                          <GripVertical size={14} className="text-slate-300 cursor-move" />
+                          {!field.isSystemField && (
+                            <GripVertical size={14} className="text-slate-300 cursor-move" />
+                          )}
+                          {field.isSystemField && (
+                            <span className="text-[8px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded uppercase">Required</span>
+                          )}
                           <input
                             type="text"
                             value={field.label}
                             onChange={(e) => updateField(field.id, { label: e.target.value })}
                             className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
+                            disabled={field.isSystemField}
                           />
-                          <button
-                            onClick={() => removeField(field.id)}
-                            className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {!field.isSystemField && (
+                            <button
+                              onClick={() => removeField(field.id)}
+                              className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3 text-xs">
-                          <label className="flex items-center gap-1.5 text-slate-500">
-                            <input
-                              type="checkbox"
-                              checked={field.required}
-                              onChange={(e) => updateField(field.id, { required: e.target.checked })}
-                              className="rounded"
-                            />
-                            Required
-                          </label>
+                          {!field.isSystemField && (
+                            <label className="flex items-center gap-1.5 text-slate-500">
+                              <input
+                                type="checkbox"
+                                checked={field.required}
+                                onChange={(e) => updateField(field.id, { required: e.target.checked })}
+                                className="rounded"
+                              />
+                              Required
+                            </label>
+                          )}
+                          {field.isSystemField && (
+                            <span className="text-indigo-500 text-[10px]">System field - always required</span>
+                          )}
                           <span className="text-slate-300">|</span>
                           <span className="text-slate-400 text-[10px] uppercase">{field.type}</span>
                         </div>
