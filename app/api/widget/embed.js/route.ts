@@ -21,10 +21,12 @@ export async function GET(request: Request) {
   const CHATBOT_ID = "${chatbotId}";
   const API_BASE = "${baseUrl}";
   let sessionId = localStorage.getItem("thorne_widget_session_" + CHATBOT_ID) || null;
+  let visitorInfo = JSON.parse(localStorage.getItem("thorne_widget_visitor_" + CHATBOT_ID) || 'null');
   let chatbotConfig = null;
   let isOpen = false;
   let pollInterval = null;
   let lastMessageTime = null;
+  let hasCompletedForm = visitorInfo !== null;
 
   // Styles
   const styles = \`
@@ -247,36 +249,115 @@ export async function GET(request: Request) {
       height: 18px;
       fill: white;
     }
-    #thorne-widget-intro {
-      padding: 20px;
+    #thorne-widget-lead-form {
+      flex: 1;
+      padding: 24px 20px;
+      overflow-y: auto;
+      background: #f8fafc;
+    }
+    .thorne-form-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 4px;
       text-align: center;
     }
-    #thorne-widget-intro input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 14px;
-      margin-bottom: 12px;
-      outline: none;
+    .thorne-form-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 20px;
+      text-align: center;
     }
-    #thorne-widget-intro input:focus {
+    .thorne-form-group {
+      margin-bottom: 14px;
+    }
+    .thorne-form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .thorne-form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: white;
+    }
+    .thorne-form-input:focus {
+      border-color: var(--thorne-color, #6366f1);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    .thorne-form-input::placeholder {
+      color: #94a3b8;
+    }
+    .thorne-opt-in-section {
+      margin-top: 18px;
+      padding: 14px;
+      background: white;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+    }
+    .thorne-opt-in-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .thorne-checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .thorne-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #334155;
+    }
+    .thorne-checkbox {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #cbd5e1;
+      border-radius: 4px;
+      cursor: pointer;
+      accent-color: var(--thorne-color, #6366f1);
+    }
+    .thorne-checkbox:checked {
       border-color: var(--thorne-color, #6366f1);
     }
-    #thorne-widget-start {
+    .thorne-form-submit {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       background: var(--thorne-color, #6366f1);
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 10px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: filter 0.2s;
+      transition: filter 0.2s, transform 0.1s;
+      margin-top: 18px;
     }
-    #thorne-widget-start:hover {
+    .thorne-form-submit:hover {
       filter: brightness(1.1);
+    }
+    .thorne-form-submit:active {
+      transform: scale(0.98);
+    }
+    .thorne-form-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     .thorne-powered {
       text-align: center;
@@ -328,8 +409,44 @@ export async function GET(request: Request) {
         </div>
         <button id="thorne-widget-close">\${closeIcon}</button>
       </div>
-      <div id="thorne-widget-messages"></div>
-      <div id="thorne-widget-input-area">
+      <div id="thorne-widget-lead-form" style="display: \${hasCompletedForm ? 'none' : 'block'};">
+        <div class="thorne-form-title">Let's get started!</div>
+        <div class="thorne-form-subtitle">Please share your details so we can assist you better.</div>
+        <form id="thorne-lead-capture-form">
+          <div class="thorne-form-group">
+            <label class="thorne-form-label">First Name *</label>
+            <input type="text" class="thorne-form-input" id="thorne-lead-name" placeholder="Enter your first name" required />
+          </div>
+          <div class="thorne-form-group">
+            <label class="thorne-form-label">Company Email *</label>
+            <input type="email" class="thorne-form-input" id="thorne-lead-email" placeholder="you@company.com" required />
+          </div>
+          <div class="thorne-form-group">
+            <label class="thorne-form-label">Cell Phone *</label>
+            <input type="tel" class="thorne-form-input" id="thorne-lead-phone" placeholder="(555) 123-4567" required />
+          </div>
+          <div class="thorne-opt-in-section">
+            <div class="thorne-opt-in-title">Communication Preferences</div>
+            <div class="thorne-checkbox-group">
+              <label class="thorne-checkbox-label">
+                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-email" checked />
+                I agree to receive emails
+              </label>
+              <label class="thorne-checkbox-label">
+                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-sms" />
+                I agree to receive text messages
+              </label>
+              <label class="thorne-checkbox-label">
+                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-phone" />
+                I agree to receive phone calls
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="thorne-form-submit">Start Chat</button>
+        </form>
+      </div>
+      <div id="thorne-widget-messages" style="display: \${hasCompletedForm ? 'flex' : 'none'};"></div>
+      <div id="thorne-widget-input-area" style="display: \${hasCompletedForm ? 'block' : 'none'};">
         <form id="thorne-widget-form">
           <input type="text" id="thorne-widget-input" placeholder="Type a message..." autocomplete="off" />
           <button type="submit" id="thorne-widget-send">\${sendIcon}</button>
@@ -344,9 +461,70 @@ export async function GET(request: Request) {
     // Event listeners
     document.getElementById('thorne-widget-close').onclick = toggleWidget;
     document.getElementById('thorne-widget-form').onsubmit = handleSend;
+    document.getElementById('thorne-lead-capture-form').onsubmit = handleLeadSubmit;
 
     // Initialize chat
     initChat();
+  }
+
+  async function handleLeadSubmit(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('thorne-lead-name').value.trim();
+    const email = document.getElementById('thorne-lead-email').value.trim();
+    const phone = document.getElementById('thorne-lead-phone').value.trim();
+    const optEmail = document.getElementById('thorne-opt-email').checked;
+    const optSms = document.getElementById('thorne-opt-sms').checked;
+    const optPhone = document.getElementById('thorne-opt-phone').checked;
+
+    if (!name || !email || !phone) return;
+
+    // Store visitor info
+    visitorInfo = {
+      name: name,
+      email: email,
+      phone: phone,
+      optInEmail: optEmail,
+      optInSms: optSms,
+      optInPhone: optPhone,
+      submittedAt: new Date().toISOString()
+    };
+    localStorage.setItem('thorne_widget_visitor_' + CHATBOT_ID, JSON.stringify(visitorInfo));
+    hasCompletedForm = true;
+
+    // Hide form, show chat
+    document.getElementById('thorne-widget-lead-form').style.display = 'none';
+    document.getElementById('thorne-widget-messages').style.display = 'flex';
+    document.getElementById('thorne-widget-input-area').style.display = 'block';
+
+    // Show welcome message
+    const messagesEl = document.getElementById('thorne-widget-messages');
+    const welcomeMsg = chatbotConfig?.welcomeMessage || chatbotConfig?.welcome_message || 'Hi there! How can I help you today?';
+    messagesEl.innerHTML = '<div class="thorne-message agent">Hi ' + escapeHtml(name) + '! ' + escapeHtml(welcomeMsg) + '</div>';
+
+    // Focus on input
+    document.getElementById('thorne-widget-input').focus();
+
+    // Send lead info to server to create/update session
+    try {
+      const res = await fetch(API_BASE + '/api/widget/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatbotId: CHATBOT_ID,
+          sessionId: sessionId,
+          visitorInfo: visitorInfo
+        }),
+      });
+      
+      const data = await res.json();
+      if (data.sessionId) {
+        sessionId = data.sessionId;
+        localStorage.setItem('thorne_widget_session_' + CHATBOT_ID, sessionId);
+      }
+    } catch (err) {
+      console.error('Widget lead error:', err);
+    }
   }
 
   async function initChat() {

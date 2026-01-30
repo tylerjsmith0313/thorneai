@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const contactId = searchParams.get("contactId")
+    const email = searchParams.get("email")
     const status = searchParams.get("status") // 'active', 'closed', or null for all
 
     const supabase = await createClient()
@@ -16,12 +17,43 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // If we have both contactId and email, fetch sessions matching either
+    // This ensures we get sessions linked by contact_id OR by email matching
+    if (contactId && email) {
+      const { data: sessions, error } = await supabase
+        .from("widget_sessions")
+        .select(`
+          *,
+          widget_chatbots (name, theme_color)
+        `)
+        .eq("user_id", user.id)
+        .or(`contact_id.eq.${contactId},visitor_email.eq.${email}`)
+        .order("last_message_at", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error fetching sessions:", error)
+        return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 })
+      }
+
+      // Also link any unlinked sessions to this contact
+      const unlinkedSessions = sessions?.filter(s => !s.contact_id && s.visitor_email === email) || []
+      if (unlinkedSessions.length > 0) {
+        await supabase
+          .from("widget_sessions")
+          .update({ contact_id: contactId })
+          .in("id", unlinkedSessions.map(s => s.id))
+      }
+
+      return NextResponse.json({ sessions: sessions || [] })
+    }
+
+    // Standard query
     let query = supabase
       .from("widget_sessions")
       .select(`
         *,
         widget_chatbots (name, theme_color),
-        contacts (firstName, lastName, email, company)
+        contacts (first_name, last_name, email, company)
       `)
       .eq("user_id", user.id)
       .order("last_message_at", { ascending: false })
