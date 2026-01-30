@@ -65,19 +65,26 @@ export async function POST(request: NextRequest) {
 
     const result = await response.json()
 
-    // Log the communication in the database
-    if (contactId) {
-      await supabase.from("contact_communications").insert({
-        contact_id: contactId,
-        user_id: user.id,
-        channel: "email",
-        direction: "outbound",
-        subject: subject,
-        content: text || html,
-        status: "sent",
-        metadata: { mailgun_id: result.id }
-      })
-    }
+    // Log the email in email_messages table
+    const { data: tenantUser } = await supabase
+      .from("tenant_users")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .single()
+
+    await supabase.from("email_messages").insert({
+      tenant_id: tenantUser?.tenant_id,
+      contact_id: contactId || null,
+      message_id: result.id,
+      from_email: fromEmail,
+      to_email: to,
+      subject: subject,
+      body_plain: text,
+      body_html: html,
+      direction: "outbound",
+      status: "sent",
+      sent_at: new Date().toISOString(),
+    })
 
     return NextResponse.json({ success: true, messageId: result.id })
   } catch (error) {
