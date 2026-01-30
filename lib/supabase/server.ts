@@ -1,8 +1,4 @@
-import { createServerClient, type SupabaseClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SupabaseServerClient = SupabaseClient<any, "public", any>
 
 // Mock client for when Supabase is not configured
 const mockClient = {
@@ -41,19 +37,23 @@ const mockClient = {
       getPublicUrl: () => ({ data: { publicUrl: '' } }),
     }),
   },
-} as unknown as SupabaseServerClient
+}
 
-export async function createClient(): Promise<SupabaseServerClient> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function createClient(): Promise<any> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !key) {
     // Return a mock client that will gracefully fail with clear error messages
-    console.warn('[Supabase Server] Not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.')
     return mockClient
   }
 
   const cookieStore = await cookies()
+  
+  // Only require @supabase/ssr when actually needed
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createServerClient } = require('@supabase/ssr')
 
   return createServerClient(url, key, {
       cookies: {

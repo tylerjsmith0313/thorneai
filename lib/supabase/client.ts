@@ -1,7 +1,5 @@
-import { createBrowserClient, type SupabaseClient } from '@supabase/ssr'
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let client: SupabaseClient<any, "public", any> | null = null
+let client: any = null
 
 // Mock client for when Supabase is not configured
 const mockClient = {
@@ -54,8 +52,7 @@ const mockClient = {
   channel: () => ({
     on: () => ({ subscribe: () => ({}) }),
   }),
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as unknown as SupabaseClient<any, "public", any>
+}
 
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -63,11 +60,13 @@ export function createClient() {
 
   if (!url || !key) {
     // Return a mock client that will gracefully fail with clear error messages
-    console.warn('[Supabase] Not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.')
     return mockClient
   }
 
   if (!client) {
+    // Only require @supabase/ssr when actually needed
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createBrowserClient } = require('@supabase/ssr')
     client = createBrowserClient(url, key)
   }
 
