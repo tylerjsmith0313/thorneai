@@ -415,10 +415,14 @@ export async function GET(request: Request) {
         <form id="thorne-lead-capture-form">
           <div class="thorne-form-group">
             <label class="thorne-form-label">First Name *</label>
-            <input type="text" class="thorne-form-input" id="thorne-lead-name" placeholder="Enter your first name" required />
+            <input type="text" class="thorne-form-input" id="thorne-lead-first-name" placeholder="Enter your first name" required />
           </div>
           <div class="thorne-form-group">
-            <label class="thorne-form-label">Company Email *</label>
+            <label class="thorne-form-label">Last Name *</label>
+            <input type="text" class="thorne-form-input" id="thorne-lead-last-name" placeholder="Enter your last name" required />
+          </div>
+          <div class="thorne-form-group">
+            <label class="thorne-form-label">Email *</label>
             <input type="email" class="thorne-form-input" id="thorne-lead-email" placeholder="you@company.com" required />
           </div>
           <div class="thorne-form-group">
@@ -426,21 +430,23 @@ export async function GET(request: Request) {
             <input type="tel" class="thorne-form-input" id="thorne-lead-phone" placeholder="(555) 123-4567" required />
           </div>
           <div class="thorne-opt-in-section">
-            <div class="thorne-opt-in-title">Communication Preferences</div>
+            <div class="thorne-opt-in-title">Communication Preferences *</div>
+            <p style="font-size: 11px; color: #64748b; margin-bottom: 10px;">You must agree to at least one communication method to continue.</p>
             <div class="thorne-checkbox-group">
               <label class="thorne-checkbox-label">
-                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-email" checked />
+                <input type="checkbox" class="thorne-checkbox thorne-opt-checkbox" id="thorne-opt-email" />
                 I agree to receive emails
               </label>
               <label class="thorne-checkbox-label">
-                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-sms" />
-                I agree to receive text messages
+                <input type="checkbox" class="thorne-checkbox thorne-opt-checkbox" id="thorne-opt-sms" />
+                I agree to receive text messages (data rates may apply)
               </label>
               <label class="thorne-checkbox-label">
-                <input type="checkbox" class="thorne-checkbox" id="thorne-opt-phone" />
+                <input type="checkbox" class="thorne-checkbox thorne-opt-checkbox" id="thorne-opt-phone" />
                 I agree to receive phone calls
               </label>
             </div>
+            <p id="thorne-opt-error" style="font-size: 11px; color: #ef4444; margin-top: 8px; display: none;">Please select at least one communication preference to continue.</p>
           </div>
           <button type="submit" class="thorne-form-submit">Start Chat</button>
         </form>
@@ -470,18 +476,30 @@ export async function GET(request: Request) {
   async function handleLeadSubmit(e) {
     e.preventDefault();
     
-    const name = document.getElementById('thorne-lead-name').value.trim();
+    const firstName = document.getElementById('thorne-lead-first-name').value.trim();
+    const lastName = document.getElementById('thorne-lead-last-name').value.trim();
     const email = document.getElementById('thorne-lead-email').value.trim();
     const phone = document.getElementById('thorne-lead-phone').value.trim();
     const optEmail = document.getElementById('thorne-opt-email').checked;
     const optSms = document.getElementById('thorne-opt-sms').checked;
     const optPhone = document.getElementById('thorne-opt-phone').checked;
 
-    if (!name || !email || !phone) return;
+    // Validate required fields
+    if (!firstName || !lastName || !email || !phone) return;
+
+    // Validate opt-in - at least one must be checked
+    const errorEl = document.getElementById('thorne-opt-error');
+    if (!optEmail && !optSms && !optPhone) {
+      errorEl.style.display = 'block';
+      return;
+    }
+    errorEl.style.display = 'none';
 
     // Store visitor info
     visitorInfo = {
-      name: name,
+      firstName: firstName,
+      lastName: lastName,
+      name: firstName + ' ' + lastName,
       email: email,
       phone: phone,
       optInEmail: optEmail,
@@ -500,7 +518,7 @@ export async function GET(request: Request) {
     // Show welcome message
     const messagesEl = document.getElementById('thorne-widget-messages');
     const welcomeMsg = chatbotConfig?.welcomeMessage || chatbotConfig?.welcome_message || 'Hi there! How can I help you today?';
-    messagesEl.innerHTML = '<div class="thorne-message agent">Hi ' + escapeHtml(name) + '! ' + escapeHtml(welcomeMsg) + '</div>';
+    messagesEl.innerHTML = '<div class="thorne-message agent">Hi ' + escapeHtml(firstName) + '! ' + escapeHtml(welcomeMsg) + '</div>';
 
     // Focus on input
     document.getElementById('thorne-widget-input').focus();

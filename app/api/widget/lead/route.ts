@@ -129,9 +129,9 @@ async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId:
       }
     } else {
       // Also check by name similarity if no email match
-      const nameParts = visitorInfo.name.split(" ")
-      const firstName = nameParts[0] || visitorInfo.name
-      const lastName = nameParts.slice(1).join(" ") || ""
+      // Use firstName and lastName if provided, otherwise parse from name
+      const firstName = visitorInfo.firstName || visitorInfo.name?.split(" ")[0] || ""
+      const lastName = visitorInfo.lastName || visitorInfo.name?.split(" ").slice(1).join(" ") || ""
 
       // Check if there's a contact with same first and last name
       const { data: nameMatches } = await supabaseAdmin
