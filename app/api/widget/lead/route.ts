@@ -98,6 +98,10 @@ export async function POST(request: Request) {
 
 async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId: string) {
   try {
+    // Parse firstName and lastName from visitorInfo at the start
+    const firstName = visitorInfo.firstName || visitorInfo.name?.split(" ")[0] || ""
+    const lastName = visitorInfo.lastName || visitorInfo.name?.split(" ").slice(1).join(" ") || ""
+
     // First try to find an existing contact by email (case-insensitive)
     const { data: existingContacts } = await supabaseAdmin
       .from("contacts")
@@ -155,10 +159,6 @@ async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId:
       }
     } else {
       // Also check by name similarity if no email match
-      // Use firstName and lastName if provided, otherwise parse from name
-      const firstName = visitorInfo.firstName || visitorInfo.name?.split(" ")[0] || ""
-      const lastName = visitorInfo.lastName || visitorInfo.name?.split(" ").slice(1).join(" ") || ""
-
       // Check if there's a contact with same first and last name
       const { data: nameMatches } = await supabaseAdmin
         .from("contacts")

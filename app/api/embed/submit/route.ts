@@ -113,12 +113,21 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       submissionId: submission.id,
+    }, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      }
     })
   } catch (error) {
     console.error("[v0] Form submission error:", error)
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
+      {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+        }
+      } as any
     )
   }
 }
