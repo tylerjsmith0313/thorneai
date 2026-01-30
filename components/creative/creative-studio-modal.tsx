@@ -26,8 +26,13 @@ import {
   Globe,
   Mail,
   Instagram,
+  Move,
+  Code,
+  ClipboardCopy,
+  Check,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { FormBuilder, type FormConfig } from "./form-builder"
 
 type ProjectType = "form" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
 
@@ -89,8 +94,13 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
   const [historyIndex, setHistoryIndex] = useState(0)
   const [saving, setSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState<string>("responsive")
+  const [formConfig, setFormConfig] = useState<FormConfig | null>(editingAsset?.canvas_data as FormConfig | null)
+  const [showEmbedCode, setShowEmbedCode] = useState(false)
+  const [embedCopied, setEmbedCopied] = useState(false)
+  const [savedFormId, setSavedFormId] = useState<string | null>(editingAsset?.id || null)
 
   const isCanvasEditor = projectType === "social_story" || projectType === "social_post"
+  const isFormBuilder = projectType === "form"
   const canvasSize = CANVAS_SIZES[projectType]
 
   // Save to history for undo/redo
@@ -222,27 +232,59 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
       const assetData = {
         name: projectName,
         type: projectType,
-        content_type: isCanvasEditor ? "json" as const : "html" as const,
-        canvas_data: isCanvasEditor ? elements : null,
-        content: isCanvasEditor ? null : generateHTML(),
-        metadata: { canvasSize, previewMode },
+        content_type: isCanvasEditor ? "json" as const : isFormBuilder ? "json" as const : "html" as const,
+        canvas_data: isCanvasEditor ? elements : isFormBuilder ? formConfig : null,
+        content: isCanvasEditor || isFormBuilder ? null : generateHTML(),
+        metadata: { canvasSize, previewMode, formConfig: isFormBuilder ? formConfig : undefined },
       }
 
-      if (editingAsset?.id) {
-        await supabase
+      if (editingAsset?.id || savedFormId) {
+        const { data } = await supabase
           .from("creative_assets")
           .update(assetData)
-          .eq("id", editingAsset.id)
+          .eq("id", editingAsset?.id || savedFormId)
+          .select()
+          .single()
+        if (data) setSavedFormId(data.id)
       } else {
-        await supabase
+        const { data } = await supabase
           .from("creative_assets")
           .insert(assetData)
+          .select()
+          .single()
+        if (data) setSavedFormId(data.id)
       }
     } catch (error) {
       console.error("[v0] Failed to save:", error)
     } finally {
       setSaving(false)
     }
+  }
+
+  // Generate embed code for forms
+  const getEmbedCode = () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const formId = savedFormId || editingAsset?.id || 'YOUR_FORM_ID'
+    
+    return `<!-- Thorne AI Embed Form -->
+<div id="thorneai-form-${formId}"></div>
+<script>
+(function() {
+  var iframe = document.createElement('iframe');
+  iframe.src = '${baseUrl}/embed/form/${formId}';
+  iframe.style.width = '100%';
+  iframe.style.height = '600px';
+  iframe.style.border = 'none';
+  iframe.style.borderRadius = '12px';
+  document.getElementById('thorneai-form-${formId}').appendChild(iframe);
+})();
+</script>`
+  }
+
+  const copyEmbedCode = () => {
+    navigator.clipboard.writeText(getEmbedCode())
+    setEmbedCopied(true)
+    setTimeout(() => setEmbedCopied(false), 2000)
   }
 
   // Generate HTML for non-canvas projects
@@ -315,6 +357,17 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
               <Button variant="outline" size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent">
                 <Download size={14} className="mr-2" />
                 Export
+              </Button>
+            )}
+            {isFormBuilder && savedFormId && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowEmbedCode(!showEmbedCode)}
+                className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent"
+              >
+                <Code size={14} className="mr-2" />
+                Get Embed Code
               </Button>
             )}
             <div className="w-px h-8 bg-slate-100 mx-2" />
@@ -397,9 +450,57 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
           )}
         </div>
 
+        {/* Embed Code Modal */}
+        {showEmbedCode && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h4 className="text-lg font-black text-slate-900">Embed Your Form</h4>
+                  <p className="text-sm text-slate-500 mt-1">Copy this code and paste it into your website</p>
+                </div>
+                <button onClick={() => setShowEmbedCode(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="bg-slate-900 rounded-2xl p-6 overflow-auto max-h-64">
+                  <pre className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-all">
+                    {getEmbedCode()}
+                  </pre>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button onClick={copyEmbedCode} className="flex-1 rounded-xl font-black uppercase tracking-widest text-[10px]">
+                    {embedCopied ? (
+                      <>
+                        <Check size={14} className="mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardCopy size={14} className="mr-2" />
+                        Copy Embed Code
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowEmbedCode(false)} className="rounded-xl font-black uppercase tracking-widest text-[10px]">
+                    Close
+                  </Button>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-xs text-amber-700">
+                    <strong>Note:</strong> Make sure to save your form first before embedding. The form will automatically capture submissions and store them in your Thorne AI dashboard.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Workspace */}
         <div className="flex-1 overflow-hidden flex bg-slate-50/40">
-          {/* Tool Sidebar */}
+          {/* Tool Sidebar - Hide for Form Builder since it has its own UI */}
+          {!isFormBuilder && (
           <aside className="w-80 bg-white border-r border-slate-100 p-8 flex flex-col gap-10 overflow-y-auto relative z-10">
             <section className="space-y-4">
               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
@@ -581,12 +682,21 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
               </div>
             </div>
           </aside>
+          )}
 
           {/* Canvas Container */}
           <main className="flex-1 relative flex flex-col items-center justify-center p-12 overflow-hidden">
             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
-            {isCanvasEditor ? (
+            {isFormBuilder ? (
+              /* Form Builder */
+              <div className="w-full h-full overflow-auto">
+                <FormBuilder 
+                  initialConfig={formConfig || undefined}
+                  onConfigChange={setFormConfig}
+                />
+              </div>
+            ) : isCanvasEditor ? (
               /* Canvas Editor for Social Story / Social Post */
               <div 
                 ref={canvasRef}

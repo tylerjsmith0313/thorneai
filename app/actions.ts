@@ -396,3 +396,29 @@ export async function bulkImportContactsAction(
   revalidatePath("/")
   return { data, count: data?.length || 0 }
 }
+
+// CONTACT FORM SUBMISSION ACTION
+export async function submitContactFormAction(formData: {
+  fullName: string
+  email: string
+  message: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .insert({
+      full_name: formData.fullName,
+      email: formData.email,
+      message: formData.message,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[v0] Error submitting contact form:", error)
+    return { error: error.message, success: false }
+  }
+
+  return { data, success: true }
+}
