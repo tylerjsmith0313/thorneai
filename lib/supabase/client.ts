@@ -1,5 +1,7 @@
+import { createBrowserClient } from '@supabase/ssr'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let client: any = null
+let client: ReturnType<typeof createBrowserClient> | null = null
 
 // Mock client for when Supabase is not configured
 const mockClient = {
@@ -52,7 +54,8 @@ const mockClient = {
   channel: () => ({
     on: () => ({ subscribe: () => ({}) }),
   }),
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any
 
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -63,30 +66,11 @@ export function createClient() {
     return mockClient
   }
 
-  return client ?? mockClient
-}
+  if (!client) {
+    client = createBrowserClient(url, key)
+  }
 
-// Async version that loads real Supabase client
-let initPromise: Promise<void> | null = null
-
-async function initClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!url || !key || client) return
-  
-  const { createBrowserClient } = await import('@supabase/ssr')
-  client = createBrowserClient(url, key)
-}
-
-// Initialize on first import if configured
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  initPromise = initClient()
-}
-
-export async function getClient() {
-  if (initPromise) await initPromise
-  return createClient()
+  return client
 }
 
 export function isSupabaseConfigured() {

@@ -1,7 +1,9 @@
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 // Mock client for when Supabase is not configured
-const mockClient = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockClient: any = {
   auth: {
     getUser: async () => ({ data: { user: null }, error: null }),
     getSession: async () => ({ data: { session: null }, error: null }),
@@ -50,9 +52,6 @@ export async function createClient(): Promise<any> {
   }
 
   const cookieStore = await cookies()
-  
-  // Dynamic import - only loads @supabase/ssr when actually needed
-  const { createServerClient } = await import('@supabase/ssr')
 
   return createServerClient(url, key, {
       cookies: {
