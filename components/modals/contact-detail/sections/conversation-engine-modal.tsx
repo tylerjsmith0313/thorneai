@@ -8,7 +8,6 @@ import {
   Mail, ArrowDownLeft, ArrowUpRight
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendEmail, sendTemplatedEmail, isEmailConfigured } from "@/lib/services/email-service"
 import { toast } from "sonner"
 import type { Contact } from "@/types"
 
@@ -40,9 +39,10 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
   
   const supabase = createClient()
 
-  // Check if email is configured
+  // Check if email is configured (via environment variables on server)
   useEffect(() => {
-    isEmailConfigured().then(setEmailConfigured)
+    // Email is available if MAILGUN env vars are set - we check this server-side
+    setEmailConfigured(true) // Assume configured, API will return error if not
   }, [])
 
   // Load email conversations for this contact - pulls both from contact_communications AND email_messages
@@ -177,17 +177,20 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
     setIsSending(true)
 
     try {
-      const result = await sendEmail({
-        to: contact.email,
-        subject: subject,
-        text: message,
-        contactId: contact.id,
-        trackOpens: true,
-        trackClicks: true,
-        tags: ["conversation-engine", "manual"]
+      const response = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: contact.email,
+          subject: subject,
+          text: message,
+          contactId: contact.id,
+        }),
       })
       
-      if (result.success) {
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
         toast.success("Email sent successfully!")
         setMessages(prev => [...prev, {
           id: `msg-${Date.now()}`,
