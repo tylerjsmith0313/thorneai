@@ -1,4 +1,5 @@
 {
+  "installCommand": "pnpm install --no-frozen-lockfile && pnpm rebuild sharp",
   "crons": [
     {
       "path": "/api/cron/automations",
