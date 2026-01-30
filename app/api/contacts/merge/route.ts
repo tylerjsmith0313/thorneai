@@ -20,14 +20,25 @@ export async function POST(request: Request) {
 
     // Verify all contacts belong to this user
     const allContactIds = [targetContactId, ...sourceContactIds]
+    console.log("[v0] Merging contacts:", { targetContactId, sourceContactIds, allContactIds })
+    
     const { data: contacts, error: contactsError } = await supabase
       .from("contacts")
       .select("*")
       .eq("user_id", user.id)
       .in("id", allContactIds)
 
-    if (contactsError || !contacts || contacts.length !== allContactIds.length) {
-      return NextResponse.json({ error: "One or more contacts not found" }, { status: 404 })
+    console.log("[v0] Found contacts:", { count: contacts?.length, expected: allContactIds.length, error: contactsError })
+
+    if (contactsError) {
+      console.error("[v0] Error fetching contacts:", contactsError)
+      return NextResponse.json({ error: `Failed to fetch contacts: ${contactsError.message}` }, { status: 500 })
+    }
+    
+    if (!contacts || contacts.length !== allContactIds.length) {
+      return NextResponse.json({ 
+        error: `One or more contacts not found. Expected ${allContactIds.length}, found ${contacts?.length || 0}` 
+      }, { status: 404 })
     }
 
     const targetContact = contacts.find(c => c.id === targetContactId)
