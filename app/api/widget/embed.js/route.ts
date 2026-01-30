@@ -350,15 +350,41 @@ export async function GET(request: Request) {
   }
 
   async function initChat() {
+    // Fetch chatbot config
+    try {
+      const res = await fetch(API_BASE + '/api/widget/config?id=' + CHATBOT_ID);
+      const data = await res.json();
+      if (data.chatbot) {
+        chatbotConfig = data.chatbot;
+        updateTheme();
+        
+        // Update header with chatbot name
+        const titleEl = document.getElementById('thorne-widget-title');
+        if (titleEl && chatbotConfig.name) {
+          titleEl.textContent = chatbotConfig.name;
+        }
+        
+        // Show welcome message
+        const messagesEl = document.getElementById('thorne-widget-messages');
+        if (chatbotConfig.welcomeMessage) {
+          messagesEl.innerHTML = '<div class="thorne-message agent">' + escapeHtml(chatbotConfig.welcomeMessage) + '</div>';
+        }
+      }
+    } catch (err) {
+      console.error('Widget config error:', err);
+    }
+
     // If we have a session, load messages
     if (sessionId) {
       await loadMessages();
       startPolling();
-    } else {
-      // Show welcome message
-      const messagesEl = document.getElementById('thorne-widget-messages');
-      messagesEl.innerHTML = '<div class="thorne-message agent">Hi there! How can I help you today?</div>';
     }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   function toggleWidget() {
@@ -466,9 +492,33 @@ export async function GET(request: Request) {
   }
 
   function updateTheme() {
-    if (chatbotConfig && chatbotConfig.themeColor) {
-      document.documentElement.style.setProperty('--thorne-color', chatbotConfig.themeColor);
+    const color = chatbotConfig?.themeColor || chatbotConfig?.theme_color;
+    if (color) {
+      document.documentElement.style.setProperty('--thorne-color', color);
+      // Also update button background directly for immediate effect
+      const button = document.getElementById('thorne-widget-button');
+      if (button) {
+        button.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + adjustColor(color, 20) + ' 100%)';
+      }
+      const header = document.getElementById('thorne-widget-header');
+      if (header) {
+        header.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + adjustColor(color, 20) + ' 100%)';
+      }
     }
+  }
+
+  function adjustColor(hex, percent) {
+    // Lighten or darken a hex color
+    const num = parseInt(hex.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return '#' + (0x1000000 +
+      (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255)
+    ).toString(16).slice(1);
   }
 
   // Initialize when DOM is ready
