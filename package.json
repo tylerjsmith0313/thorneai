@@ -1,6 +1,6 @@
 {
   "name": "thorne-neural-core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "build": "next build",
@@ -76,10 +76,5 @@
     "postcss": "8.5.6",
     "tailwindcss": "^4.1.9",
     "typescript": "~5.8.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sharp"
-    ]
   }
 }
