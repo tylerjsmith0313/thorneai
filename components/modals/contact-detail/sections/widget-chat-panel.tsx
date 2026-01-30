@@ -47,10 +47,17 @@ export function WidgetChatPanel({ contact }: WidgetChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  // Fetch sessions for this contact
+  // Fetch sessions for this contact (by ID and email matching)
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/widget/sessions?contactId=${contact.id}`)
+      // Fetch by contact ID and also by email for matching
+      const params = new URLSearchParams()
+      params.set("contactId", contact.id)
+      if (contact.email) {
+        params.set("email", contact.email)
+      }
+      
+      const res = await fetch(`/api/widget/sessions?${params.toString()}`)
       const data = await res.json()
       if (data.sessions) {
         setSessions(data.sessions)
@@ -64,7 +71,7 @@ export function WidgetChatPanel({ contact }: WidgetChatPanelProps) {
     } finally {
       setLoading(false)
     }
-  }, [contact.id, selectedSession])
+  }, [contact.id, contact.email, selectedSession])
 
   // Fetch messages for selected session
   const fetchMessages = useCallback(async () => {

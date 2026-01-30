@@ -93,51 +93,88 @@ export async function POST(request: Request) {
 
 async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId: string) {
   try {
-    // First try to find an existing contact by email
-    const { data: existingContact } = await supabaseAdmin
+    // First try to find an existing contact by email (case-insensitive)
+    const { data: existingContacts } = await supabaseAdmin
       .from("contacts")
-      .select("id")
+      .select("id, first_name, last_name, email, phone")
       .eq("user_id", userId)
-      .eq("email", visitorInfo.email)
-      .single()
+      .ilike("email", visitorInfo.email)
 
-    let contactId = existingContact?.id
+    let contactId: string | null = null
 
-    if (!contactId) {
-      // Create a new contact
+    if (existingContacts && existingContacts.length > 0) {
+      // Use the first matching contact
+      contactId = existingContacts[0].id
+
+      // Update existing contact with new info (merge data)
+      const updateData: Record<string, any> = {
+        opt_in_email: visitorInfo.optInEmail,
+        opt_in_sms: visitorInfo.optInSms,
+        opt_in_phone: visitorInfo.optInPhone,
+      }
+      
+      // Only update phone if the existing one is empty
+      if (!existingContacts[0].phone && visitorInfo.phone) {
+        updateData.phone = visitorInfo.phone
+      }
+
+      await supabaseAdmin
+        .from("contacts")
+        .update(updateData)
+        .eq("id", contactId)
+
+      // If there are multiple contacts with same email, log it for potential merge
+      if (existingContacts.length > 1) {
+        console.log(`[Widget] Found ${existingContacts.length} contacts with email ${visitorInfo.email} - consider merging`)
+      }
+    } else {
+      // Also check by name similarity if no email match
       const nameParts = visitorInfo.name.split(" ")
       const firstName = nameParts[0] || visitorInfo.name
       const lastName = nameParts.slice(1).join(" ") || ""
 
-      const { data: newContact } = await supabaseAdmin
+      // Check if there's a contact with same first and last name
+      const { data: nameMatches } = await supabaseAdmin
         .from("contacts")
-        .insert({
-          user_id: userId,
-          first_name: firstName,
-          last_name: lastName,
-          email: visitorInfo.email,
-          phone: visitorInfo.phone,
-          source: "widget",
-          status: "lead",
-          opt_in_email: visitorInfo.optInEmail,
-          opt_in_sms: visitorInfo.optInSms,
-          opt_in_phone: visitorInfo.optInPhone,
-        })
-        .select("id")
-        .single()
+        .select("id, email")
+        .eq("user_id", userId)
+        .ilike("first_name", firstName)
+        .ilike("last_name", lastName || firstName)
 
-      contactId = newContact?.id
-    } else {
-      // Update existing contact with opt-in preferences if they've changed
-      await supabaseAdmin
-        .from("contacts")
-        .update({
-          phone: visitorInfo.phone,
-          opt_in_email: visitorInfo.optInEmail,
-          opt_in_sms: visitorInfo.optInSms,
-          opt_in_phone: visitorInfo.optInPhone,
-        })
-        .eq("id", contactId)
+      if (nameMatches && nameMatches.length > 0 && !nameMatches[0].email) {
+        // Found a name match with no email - update it
+        contactId = nameMatches[0].id
+        await supabaseAdmin
+          .from("contacts")
+          .update({
+            email: visitorInfo.email,
+            phone: visitorInfo.phone,
+            opt_in_email: visitorInfo.optInEmail,
+            opt_in_sms: visitorInfo.optInSms,
+            opt_in_phone: visitorInfo.optInPhone,
+          })
+          .eq("id", contactId)
+      } else {
+        // Create a new contact
+        const { data: newContact } = await supabaseAdmin
+          .from("contacts")
+          .insert({
+            user_id: userId,
+            first_name: firstName,
+            last_name: lastName,
+            email: visitorInfo.email,
+            phone: visitorInfo.phone,
+            source: "widget",
+            status: "lead",
+            opt_in_email: visitorInfo.optInEmail,
+            opt_in_sms: visitorInfo.optInSms,
+            opt_in_phone: visitorInfo.optInPhone,
+          })
+          .select("id")
+          .single()
+
+        contactId = newContact?.id || null
+      }
     }
 
     // Link session to contact
@@ -146,6 +183,14 @@ async function matchOrCreateContact(userId: string, visitorInfo: any, sessionId:
         .from("widget_sessions")
         .update({ contact_id: contactId })
         .eq("id", sessionId)
+
+      // Also link any other sessions from this email that aren't linked
+      await supabaseAdmin
+        .from("widget_sessions")
+        .update({ contact_id: contactId })
+        .eq("user_id", userId)
+        .eq("visitor_email", visitorInfo.email)
+        .is("contact_id", null)
     }
   } catch (error) {
     console.error("Contact matching error:", error)
