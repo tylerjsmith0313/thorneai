@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -6,30 +6,44 @@ export async function createClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !key) {
-    throw new Error(
-      'Supabase is not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.'
-    )
+    // Return a mock client that indicates Supabase is not configured
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: { message: 'Supabase not configured' } }),
+        getSession: async () => ({ data: { session: null }, error: { message: 'Supabase not configured' } }),
+        signOut: async () => ({ error: null }),
+        signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signUp: async () => ({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+      },
+      from: () => ({
+        select: () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        insert: () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        update: () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        delete: () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        upsert: () => ({ data: null, error: { message: 'Supabase not configured' } }),
+      }),
+      _isConfigured: false,
+    } as unknown as ReturnType<typeof createServerClient>
   }
 
   const cookieStore = await cookies()
 
   return createServerClient(url, key, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            )
-          } catch {
-            // The "setAll" method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          )
+        } catch {
+          // The "setAll" method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
-  )
+  })
 }
