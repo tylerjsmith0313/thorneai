@@ -32,7 +32,14 @@ import {
   Check,
   X,
   Loader2,
+  MessageSquare,
+  Copy,
+  Plus,
+  Code,
+  Palette,
+  CheckCircle,
 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { SUBSCRIPTION_PLANS, formatPrice, getPlanById } from "@/lib/subscription-products"
@@ -69,6 +76,17 @@ interface Invitation {
   created_at: string
 }
 
+interface WidgetChatbot {
+  id: string
+  name: string
+  welcome_message: string
+  ai_instructions: string | null
+  theme_color: string
+  is_active: boolean
+  embed_key: string
+  created_at: string
+}
+
 export function AdminSettingsClient() {
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [users, setUsers] = useState<TenantUser[]>([])
@@ -85,6 +103,16 @@ export function AdminSettingsClient() {
   // Settings state
   const [tenantName, setTenantName] = useState("")
   const [savingSettings, setSavingSettings] = useState(false)
+  
+  // Widget state
+  const [chatbots, setChatbots] = useState<WidgetChatbot[]>([])
+  const [showCreateChatbot, setShowCreateChatbot] = useState(false)
+  const [newChatbotName, setNewChatbotName] = useState("")
+  const [newChatbotWelcome, setNewChatbotWelcome] = useState("Hi there! How can I help you today?")
+  const [newChatbotColor, setNewChatbotColor] = useState("#6366f1")
+  const [newChatbotInstructions, setNewChatbotInstructions] = useState("")
+  const [creatingChatbot, setCreatingChatbot] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -128,6 +156,16 @@ export function AdminSettingsClient() {
     
     if (invitesData) {
       setInvitations(invitesData)
+    }
+
+    // Load chatbots
+    const { data: chatbotsData } = await supabase
+      .from("widget_chatbots")
+      .select("*")
+      .order("created_at", { ascending: false })
+    
+    if (chatbotsData) {
+      setChatbots(chatbotsData)
     }
 
     setLoading(false)
@@ -211,6 +249,66 @@ export function AdminSettingsClient() {
     }
   }
 
+  async function handleCreateChatbot() {
+    if (!newChatbotName.trim()) return
+    setCreatingChatbot(true)
+
+    try {
+      const res = await fetch("/api/widget/chatbots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newChatbotName,
+          welcomeMessage: newChatbotWelcome,
+          aiInstructions: newChatbotInstructions || null,
+          themeColor: newChatbotColor,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.chatbot) {
+        setChatbots([data.chatbot, ...chatbots])
+        setShowCreateChatbot(false)
+        setNewChatbotName("")
+        setNewChatbotWelcome("Hi there! How can I help you today?")
+        setNewChatbotColor("#6366f1")
+        setNewChatbotInstructions("")
+      }
+    } catch (error) {
+      console.error("[v0] Error creating chatbot:", error)
+    }
+    setCreatingChatbot(false)
+  }
+
+  async function handleToggleChatbot(chatbot: WidgetChatbot) {
+    const newStatus = !chatbot.is_active
+    setChatbots(chatbots.map(c => c.id === chatbot.id ? { ...c, is_active: newStatus } : c))
+    
+    await fetch("/api/widget/chatbots", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: chatbot.id, isActive: newStatus }),
+    })
+  }
+
+  async function handleDeleteChatbot(chatbotId: string) {
+    if (!confirm("Are you sure you want to delete this chatbot? All chat history will be lost.")) return
+    
+    await fetch(`/api/widget/chatbots?id=${chatbotId}`, { method: "DELETE" })
+    setChatbots(chatbots.filter(c => c.id !== chatbotId))
+  }
+
+  function getEmbedCode(chatbot: WidgetChatbot) {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
+    return `<script src="${baseUrl}/api/widget/embed.js?id=${chatbot.id}" async></script>`
+  }
+
+  function copyEmbedCode(chatbot: WidgetChatbot) {
+    navigator.clipboard.writeText(getEmbedCode(chatbot))
+    setCopiedId(chatbot.id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
   const plan = tenant ? getPlanById(tenant.plan) : null
   const usedSeats = users.length
   const pendingSeats = invitations.length
@@ -268,6 +366,10 @@ export function AdminSettingsClient() {
             <TabsTrigger value="billing" className="gap-2">
               <CreditCard size={16} />
               Billing
+            </TabsTrigger>
+            <TabsTrigger value="widget" className="gap-2">
+              <MessageSquare size={16} />
+              Chat Widget
             </TabsTrigger>
           </TabsList>
 
@@ -658,8 +760,231 @@ export function AdminSettingsClient() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Widget Tab */}
+          <TabsContent value="widget" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Chat Widgets</CardTitle>
+                  <CardDescription>
+                    Create embeddable chat widgets for your website to capture leads and engage visitors
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setShowCreateChatbot(true)} className="gap-2">
+                  <Plus size={16} />
+                  Create Widget
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {chatbots.length === 0 ? (
+                  <div className="text-center py-12 bg-slate-50 rounded-lg">
+                    <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="font-medium text-slate-900 mb-1">No chat widgets yet</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                      Create your first widget to start capturing leads from your website
+                    </p>
+                    <Button onClick={() => setShowCreateChatbot(true)} className="gap-2">
+                      <Plus size={16} />
+                      Create Your First Widget
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {chatbots.map((chatbot) => (
+                      <div
+                        key={chatbot.id}
+                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className="w-12 h-12 rounded-xl flex items-center justify-center"
+                            style={{ backgroundColor: chatbot.theme_color }}
+                          >
+                            <MessageSquare className="text-white" size={24} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-900">{chatbot.name}</span>
+                              <Badge
+                                variant="outline"
+                                className={chatbot.is_active ? "text-emerald-600 border-emerald-200 bg-emerald-50" : "text-slate-500"}
+                              >
+                                {chatbot.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-slate-500 mt-0.5">{chatbot.welcome_message}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => copyEmbedCode(chatbot)}
+                          >
+                            {copiedId === chatbot.id ? (
+                              <>
+                                <CheckCircle size={14} className="text-emerald-500" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Code size={14} />
+                                Get Code
+                              </>
+                            )}
+                          </Button>
+                          <Switch
+                            checked={chatbot.is_active}
+                            onCheckedChange={() => handleToggleChatbot(chatbot)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteChatbot(chatbot.id)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Embed Instructions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>How to Install</CardTitle>
+                <CardDescription>
+                  Add the chat widget to your website in just a few steps
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-4 p-4 bg-violet-50 rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                    1
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-slate-900">Create a widget</h4>
+                    <p className="text-sm text-slate-600">
+                      Click "Create Widget" to set up a new chat widget with your custom branding and welcome message.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-violet-50 rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                    2
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-slate-900">Copy the embed code</h4>
+                    <p className="text-sm text-slate-600">
+                      Click "Get Code" to copy the HTML snippet for your widget.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-violet-50 rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                    3
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-slate-900">Paste before {"</body>"}</h4>
+                    <p className="text-sm text-slate-600">
+                      Add the code snippet to your website, just before the closing {"</body>"} tag. The widget will appear automatically.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-emerald-50 rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                    <Check size={16} />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-slate-900">Start chatting!</h4>
+                    <p className="text-sm text-slate-600">
+                      Messages from visitors will appear in real-time in your dashboard. You can reply directly from the contact's chat panel.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Create Chatbot Modal */}
+      <Dialog open={showCreateChatbot} onOpenChange={setShowCreateChatbot}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Chat Widget</DialogTitle>
+            <DialogDescription>
+              Set up a new embeddable chat widget for your website
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="chatbot-name">Widget Name</Label>
+              <Input
+                id="chatbot-name"
+                placeholder="e.g., Main Website, Landing Page"
+                value={newChatbotName}
+                onChange={(e) => setNewChatbotName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="chatbot-welcome">Welcome Message</Label>
+              <Textarea
+                id="chatbot-welcome"
+                placeholder="Hi there! How can I help you today?"
+                value={newChatbotWelcome}
+                onChange={(e) => setNewChatbotWelcome(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="chatbot-color">Theme Color</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  id="chatbot-color"
+                  value={newChatbotColor}
+                  onChange={(e) => setNewChatbotColor(e.target.value)}
+                  className="w-12 h-10 rounded border border-slate-200 cursor-pointer"
+                />
+                <Input
+                  value={newChatbotColor}
+                  onChange={(e) => setNewChatbotColor(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="chatbot-instructions">AI Instructions (Optional)</Label>
+              <Textarea
+                id="chatbot-instructions"
+                placeholder="Custom instructions for how the AI should respond to visitors..."
+                value={newChatbotInstructions}
+                onChange={(e) => setNewChatbotInstructions(e.target.value)}
+                rows={3}
+              />
+              <p className="text-xs text-slate-500">
+                These instructions will guide the AI when auto-responding to visitors
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateChatbot(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateChatbot} disabled={creatingChatbot || !newChatbotName.trim()}>
+              {creatingChatbot ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create Widget
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Invite Modal */}
       <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
