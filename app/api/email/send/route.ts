@@ -39,22 +39,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Mailgun not configured" }, { status: 500 })
     }
 
-    // Send email via Mailgun API
-    const mailgunUrl = `https://api.mailgun.net/v3/${domain}/messages`
+    // Handle region mismatch (US vs EU) - common fix for 401 errors
+    const region = process.env.MAILGUN_REGION || "US"
+    const baseUrl = region.toUpperCase() === "EU" 
+      ? "https://api.eu.mailgun.net" 
+      : "https://api.mailgun.net"
     
-    const formData = new FormData()
-    formData.append("from", fromEmail)
-    formData.append("to", to)
-    formData.append("subject", subject)
-    if (text) formData.append("text", text)
-    if (html) formData.append("html", html)
-
+    const mailgunUrl = `${baseUrl}/v3/${domain}/messages`
+    
+    // Use URLSearchParams for proper x-www-form-urlencoded format (Mailgun requirement)
     const response = await fetch(mailgunUrl, {
       method: "POST",
       headers: {
         Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: formData,
+      body: new URLSearchParams({
+        from: fromEmail,
+        to,
+        subject,
+        text: text || "",
+        html: html || "",
+      }),
     })
 
     if (!response.ok) {
