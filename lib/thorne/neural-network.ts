@@ -673,11 +673,11 @@ export const getConversationAnalytics = () =>
 export const structureDataForAI = (contextType: 'contact' | 'opportunity' | 'conversation' | 'full', entityId?: string) => 
   thorneNeuralNetwork.structureDataForAI(contextType, entityId)
 
-export const generateReport = (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
+export const generateReport = async (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
   startDate?: Date
   endDate?: Date
   includeCharts?: boolean
 }) => thorneNeuralNetwork.generateReport(reportType, options)
 
-export const aggregatePerformanceData = () => 
+export const aggregatePerformanceData = async () => 
   thorneNeuralNetwork.aggregatePerformanceData()
