@@ -16,6 +16,8 @@ import {
   HelpCircle,
   Users,
   Info,
+  Check,
+  FileText,
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BaseInput } from "@/components/ui/base-input"
@@ -327,6 +329,10 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   </div>
                 </div>
 
+                <p className="text-[9px] text-slate-400 font-medium leading-relaxed italic pt-2 relative z-10">
+                  {'"'}Optimized for {formData.type} delivery. Volume adjusted to {formData.volume} nodes.{'"'}
+                </p>
+
                 <Activity
                   size={100}
                   className="absolute right-[-20px] bottom-[-20px] text-indigo-500/10 pointer-events-none"
@@ -475,41 +481,80 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
               </div>
             </div>
 
-            {formData.intelNodes.length === 0 && (
-              <div className="py-8 text-center text-slate-300">
-                <p className="text-[10px] font-bold uppercase tracking-widest">No intelligence sources added</p>
-              </div>
-            )}
-
-            {formData.intelNodes.map((node) => (
-              <div
-                key={node.id}
-                className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  {node.type === "Link" && <LinkIcon size={14} className="text-indigo-500" />}
-                  {node.type === "File" && <Upload size={14} className="text-emerald-500" />}
-                  {node.type === "Text" && <AlignLeft size={14} className="text-amber-500" />}
-                  <span className="text-xs font-medium text-slate-700">{node.label}</span>
-                </div>
-                <button
-                  onClick={() => removeIntelNode(node.id)}
-                  className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+            <div className="space-y-2">
+              {formData.intelNodes.map((node) => (
+                <div
+                  key={node.id}
+                  className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group shadow-sm hover:bg-white transition-all"
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="text-slate-400">
+                      {node.type === "Link" ? (
+                        <LinkIcon size={14} />
+                      ) : node.type === "File" ? (
+                        <FileText size={14} />
+                      ) : (
+                        <AlignLeft size={14} />
+                      )}
+                    </div>
+                    <input
+                      className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-none flex-1"
+                      value={node.label}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          intelNodes: formData.intelNodes.map((n) =>
+                            n.id === node.id ? { ...n, label: e.target.value } : n
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                  <button
+                    onClick={() => removeIntelNode(node.id)}
+                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              {formData.intelNodes.length === 0 && (
+                <p className="text-[10px] text-slate-400 italic text-center py-4 opacity-50 font-medium tracking-wide">
+                  No intelligence nodes attached.
+                </p>
+              )}
+            </div>
+
+            
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-100 flex items-center justify-end gap-3 bg-white shrink-0">
-          <BaseButton variant="outline" onClick={onClose}>
-            Cancel
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <BaseButton
+            variant="ghost"
+            onClick={onClose}
+            className="text-[10px] uppercase font-bold text-slate-400 tracking-widest"
+          >
+            Discard Node
           </BaseButton>
-          <BaseButton variant="primary" onClick={handleSave}>
-            Save Product
-          </BaseButton>
+          <div className="flex gap-2">
+            <BaseButton
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-slate-200 font-bold uppercase tracking-widest text-[10px]"
+            >
+              Save Draft
+            </BaseButton>
+            <BaseButton
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+              className="rounded-xl px-10 shadow-lg shadow-indigo-100 font-bold uppercase tracking-widest text-[10px]"
+              icon={<Check size={16} />}
+            >
+              Deploy Offer
+            </BaseButton>
+          </div>
         </div>
       </div>
     </div>
