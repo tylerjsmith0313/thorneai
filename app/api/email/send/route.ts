@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
     const region = (useUserConfig ? userInt.mailgun_region : process.env.MAILGUN_REGION) || "US"
 
     // Safe logging for debugging (no API key exposed)
-    console.log(`[Mailgun] Config: ${useUserConfig ? "USER_DB" : "ENV_GLOBAL"} | Domain: ${domain} | Region: ${region} | From: ${fromEmail}`)
+    console.log(`[v0] [Mailgun] Config: ${useUserConfig ? "USER_DB" : "ENV_GLOBAL"} | Domain: ${domain} | Region: ${region} | From: ${fromEmail}`)
+    console.log(`[v0] [Mailgun] Attempting to send to: ${to} | Subject: ${subject?.substring(0, 50)}...`)
 
     if (!apiKey || !domain || !fromEmail) {
       console.error(`[Mailgun] Missing config - apiKey: ${!!apiKey}, domain: ${!!domain}, fromEmail: ${!!fromEmail}`)
@@ -80,13 +81,29 @@ export async function POST(request: NextRequest) {
         errorMessage = errorText
       }
       
-      console.error(`[Mailgun Error] Status: ${response.status} | Domain: ${domain} | Region: ${region} | Message: ${errorMessage}`)
+      console.error(`[v0] [Mailgun Error] Status: ${response.status} | Domain: ${domain} | Region: ${region} | Message: ${errorMessage}`)
+      console.error(`[v0] [Mailgun Error] Full response: ${errorText}`)
+      
+      // Common Mailgun error explanations
+      let explanation = ""
+      if (response.status === 401) {
+        explanation = "API key invalid or unauthorized. Check MAILGUN_API_KEY."
+      } else if (response.status === 404) {
+        explanation = "Domain not found. Verify domain is added and verified in Mailgun."
+      } else if (response.status === 400) {
+        explanation = "Bad request - check sender email format or domain DNS."
+      } else if (response.status === 403) {
+        explanation = "Forbidden - domain may need verification or sender authorization."
+      }
       
       return NextResponse.json({ 
         error: errorMessage,
+        explanation,
         status: response.status,
         domain,
-        region
+        region,
+        to,
+        from: fromEmail,
       }, { status: response.status })
     }
 
@@ -99,7 +116,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single()
 
-    await supabase.from("email_messages").insert({
+    const { error: logError } = await supabase.from("email_messages").insert({
       tenant_id: tenantUser?.tenant_id,
       contact_id: contactId || null,
       message_id: result.id,
@@ -112,6 +129,11 @@ export async function POST(request: NextRequest) {
       status: "sent",
       sent_at: new Date().toISOString(),
     })
+    
+    if (logError) {
+      console.error("[v0] Failed to log email to database:", logError)
+      // Don't fail the request - email was sent successfully
+    }
 
     console.log(`[Mailgun] Email sent successfully | ID: ${result.id} | To: ${to}`)
     return NextResponse.json({ success: true, messageId: result.id })

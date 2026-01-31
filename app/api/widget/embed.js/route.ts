@@ -545,13 +545,27 @@ export async function GET(request: Request) {
     }
   }
 
+  let initRetries = 0;
+  const MAX_INIT_RETRIES = 3;
+
   async function initChat() {
-    // Fetch chatbot config
+    // Fetch chatbot config with retry logic
     try {
-      const res = await fetch(API_BASE + '/api/widget/config?id=' + CHATBOT_ID);
+      const res = await fetch(API_BASE + '/api/widget/config?id=' + CHATBOT_ID, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      
+      if (!res.ok) {
+        throw new Error('Config fetch failed: ' + res.status);
+      }
+      
       const data = await res.json();
       if (data.chatbot) {
         chatbotConfig = data.chatbot;
+        // Store config in localStorage for offline/retry recovery
+        localStorage.setItem('thorne_widget_config_' + CHATBOT_ID, JSON.stringify(chatbotConfig));
         updateTheme();
         
         // Update header with chatbot name
@@ -568,6 +582,26 @@ export async function GET(request: Request) {
       }
     } catch (err) {
       console.error('Widget config error:', err);
+      
+      // Try to use cached config
+      const cachedConfig = localStorage.getItem('thorne_widget_config_' + CHATBOT_ID);
+      if (cachedConfig) {
+        try {
+          chatbotConfig = JSON.parse(cachedConfig);
+          updateTheme();
+          console.log('Using cached widget config');
+        } catch (e) {
+          console.error('Failed to parse cached config');
+        }
+      }
+      
+      // Retry after delay if not at max retries
+      if (initRetries < MAX_INIT_RETRIES) {
+        initRetries++;
+        console.log('Retrying widget init (' + initRetries + '/' + MAX_INIT_RETRIES + ')...');
+        setTimeout(initChat, 2000 * initRetries);
+        return;
+      }
     }
 
     // If we have a session, load messages
@@ -716,6 +750,28 @@ export async function GET(request: Request) {
       (B < 255 ? B < 1 ? 0 : B : 255)
     ).toString(16).slice(1);
   }
+
+  // Re-initialize widget if it gets removed (SPA navigation, etc.)
+  function ensureWidgetExists() {
+    if (!document.getElementById('thorne-widget-container')) {
+      console.log('Widget container missing, re-creating...');
+      createWidget();
+    }
+  }
+
+  // Handle visibility changes - reinitialize if needed when page becomes visible
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      ensureWidgetExists();
+      // Restart polling if widget was open
+      if (isOpen && sessionId && !pollInterval) {
+        startPolling();
+      }
+    }
+  });
+
+  // Also check periodically (backup for edge cases)
+  setInterval(ensureWidgetExists, 30000); // Check every 30 seconds
 
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
