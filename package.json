@@ -1,6 +1,6 @@
 {
   "name": "thorne-neural-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "build": "next build",
@@ -40,7 +40,7 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@stripe/react-stripe-js": "5.5.0",
     "@stripe/stripe-js": "8.6.4",
-    "@supabase/ssr": "^0.5.2",
+    "@supabase/ssr": "0.5.2",
     "@supabase/supabase-js": "^2.49.4",
     "@vercel/analytics": "1.6.1",
     "ai": "6.0.57",
