@@ -87,19 +87,23 @@ export async function POST(request: Request) {
         } else {
           // Create new contact from widget visitor
           const nameParts = (visitorName || "").split(" ")
-          const { data: newContact } = await supabase
+          const { data: newContact, error: contactError } = await supabase
             .from("contacts")
             .insert({
               user_id: chatbot.user_id,
               email: visitorEmail,
-              firstName: nameParts[0] || "Widget",
-              lastName: nameParts.slice(1).join(" ") || "Visitor",
+              first_name: nameParts[0] || "Widget",
+              last_name: nameParts.slice(1).join(" ") || "Visitor",
               source: "Widget Chat",
               tags: ["widget-chat"],
               notes: `Lead captured via widget: ${chatbot.name}`,
             })
             .select("id")
             .single()
+          
+          if (contactError) {
+            console.error("[v0] Error creating contact from widget:", contactError)
+          }
 
           if (newContact) {
             await supabase

@@ -203,8 +203,16 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
         setMessage("")
         setSubject(`Follow up from AgyntSynq`)
       } else {
-        toast.error(result.error || "Failed to send email")
-        console.error("[v0] Failed to send email:", result.error)
+        // Enhanced error display for debugging
+        const errorDetails = result.debug ? `\n\nDebug: ${result.debug.errorMessage}` : ""
+        toast.error(`${result.error || "Failed to send email"}${result.domain ? ` (Domain: ${result.domain})` : ""}`)
+        console.error("[v0] Failed to send email:", {
+          error: result.error,
+          status: result.status,
+          domain: result.domain,
+          region: result.region,
+          debug: result.debug
+        })
       }
     } catch (error) {
       console.error("[v0] Failed to send message:", error)
