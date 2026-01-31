@@ -22,12 +22,6 @@ import {
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BaseInput } from "@/components/ui/base-input"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { createClient } from "@/lib/supabase/client"
 
 interface AdjustmentNode {
@@ -259,16 +253,11 @@ export function AddProductModal({ userId, onClose, onProductAdded }: AddProductM
           <div className="space-y-4 pt-6 border-t border-slate-100">
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Classification</h3>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info size={14} className="text-slate-300 hover:text-indigo-500 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Consulting/Training models leverage volume-based math for scaling projections.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Info 
+                size={14} 
+                className="text-slate-300 hover:text-indigo-500 cursor-help" 
+                title="Consulting/Training models leverage volume-based math for scaling projections."
+              />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {productTypes.map((t) => (
