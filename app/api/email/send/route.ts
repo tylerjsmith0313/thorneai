@@ -52,11 +52,11 @@ export async function POST(request: NextRequest) {
     
     const mailgunUrl = `${baseUrl}/v3/${domain}/messages`
     
-    // 4. Use Buffer.from for Node.js compatibility + URLSearchParams for proper format
+    // 4. Use btoa for Edge Runtime compatibility + URLSearchParams for proper format
     const response = await fetch(mailgunUrl, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${Buffer.from("api:" + apiKey).toString("base64")}`,
+        Authorization: `Basic ${btoa(`api:${apiKey}`)}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
