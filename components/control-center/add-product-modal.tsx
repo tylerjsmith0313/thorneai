@@ -21,7 +21,6 @@ import {
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BaseInput } from "@/components/ui/base-input"
-import { BaseTextArea } from "@/components/ui/base-textarea"
 import {
   Tooltip,
   TooltipContent,
@@ -203,15 +202,16 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   placeholder="e.g. Consulting Mastermind 2024"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 ml-1">Pitch Context</label>
-                <BaseTextArea
+                <textarea
                   placeholder="Define core value proposition for Thorne AI..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="min-h-[80px]"
+                  className="w-full px-4 py-3 bg-slate-900 rounded-2xl text-sm font-medium text-white placeholder:text-slate-500 outline-none transition-all focus:ring-2 focus:ring-indigo-500/30 min-h-[80px] resize-none"
                 />
               </div>
             </div>
@@ -349,6 +349,7 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   icon={<DollarSign size={14} />}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
@@ -359,6 +360,7 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   value={formData.volume}
                   onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
                   icon={<Users size={14} />}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
