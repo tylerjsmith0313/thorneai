@@ -658,26 +658,26 @@ interface Activity {
 export const thorneNeuralNetwork = ThorneNeuralNetwork.getInstance()
 
 // Export convenience functions
-export const getDashboardMetrics = (timeframe?: AnalyticsTimeframe) => 
+export const getDashboardMetrics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getDashboardMetrics(timeframe)
 
-export const getContactAnalytics = (timeframe?: AnalyticsTimeframe) => 
+export const getContactAnalytics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getContactAnalytics(timeframe)
 
-export const getRevenueAnalytics = (timeframe?: AnalyticsTimeframe) => 
+export const getRevenueAnalytics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getRevenueAnalytics(timeframe)
 
-export const getConversationAnalytics = () => 
+export const getConversationAnalytics = async () => 
   thorneNeuralNetwork.getConversationAnalytics()
 
-export const structureDataForAI = (contextType: 'contact' | 'opportunity' | 'conversation' | 'full', entityId?: string) => 
+export const structureDataForAI = async (contextType: 'contact' | 'opportunity' | 'conversation' | 'full', entityId?: string) => 
   thorneNeuralNetwork.structureDataForAI(contextType, entityId)
 
-export const generateReport = (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
+export const generateReport = async (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
   startDate?: Date
   endDate?: Date
   includeCharts?: boolean
 }) => thorneNeuralNetwork.generateReport(reportType, options)
 
-export const aggregatePerformanceData = () => 
+export const aggregatePerformanceData = async () => 
   thorneNeuralNetwork.aggregatePerformanceData()
