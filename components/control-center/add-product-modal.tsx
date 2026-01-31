@@ -18,6 +18,7 @@ import {
   Info,
   Check,
   FileText,
+  Loader2,
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BaseInput } from "@/components/ui/base-input"
@@ -27,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { createClient } from "@/lib/supabase/client"
 
 interface AdjustmentNode {
   id: string
@@ -43,17 +45,24 @@ interface IntelNode {
   content: string
 }
 
-interface AddProductModalProps {
-  onClose: () => void
-  onSave: (product: {
-    name: string
-    price: string
-    billingCycle: string
-    type: string
-  }) => void
+interface Product {
+  id: string
+  name: string
+  retail_price: number
+  billing_interval: string
+  classification: string
+  pitch_context?: string
+  is_deployed?: boolean
 }
 
-export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
+interface AddProductModalProps {
+  userId: string
+  onClose: () => void
+  onProductAdded: (product: Product) => void
+}
+
+export function AddProductModal({ userId, onClose, onProductAdded }: AddProductModalProps) {
+  const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showComplexBreakdown, setShowComplexBreakdown] = useState(false)
   const [formData, setFormData] = useState({
@@ -119,9 +128,39 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
     })
   }
 
-  const handleSave = () => {
-    onSave(formData)
-    onClose()
+  const handleSave = async () => {
+    if (!userId || !formData.name.trim()) return
+    
+    setIsSaving(true)
+    
+    const supabase = createClient()
+    
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        user_id: userId,
+        name: formData.name.trim(),
+        pitch_context: formData.description.trim() || null,
+        classification: formData.type.toLowerCase(),
+        retail_price: parseFloat(formData.price) || 0,
+        billing_interval: formData.billingCycle.toLowerCase().replace("-", "_"),
+        is_deployed: false,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error("[v0] Error creating product:", error)
+      setIsSaving(false)
+      return
+    }
+    
+    if (data) {
+      onProductAdded(data)
+      onClose()
+    }
+    
+    setIsSaving(false)
   }
 
   const calculations = () => {
@@ -551,10 +590,11 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
               variant="primary"
               size="sm"
               onClick={handleSave}
+              disabled={isSaving || !formData.name.trim()}
               className="rounded-xl px-10 shadow-lg shadow-indigo-100 font-bold uppercase tracking-widest text-[10px]"
-              icon={<Check size={16} />}
+              icon={isSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
             >
-              Deploy Offer
+              {isSaving ? "Deploying..." : "Deploy Offer"}
             </BaseButton>
           </div>
         </div>
