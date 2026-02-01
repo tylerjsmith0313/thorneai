@@ -24,34 +24,32 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single()
 
-    // 2. Credential Prioritization: User config ONLY if enabled, otherwise ONLY global env vars
+    // 2. Credential Prioritization
     const useUserConfig = !!(userInt?.mailgun_enabled && userInt?.mailgun_api_key)
     
-    // Resolve credentials with strict priority (no mixing)
     const apiKey = useUserConfig ? userInt.mailgun_api_key : process.env.MAILGUN_API_KEY
     const domain = useUserConfig ? userInt.mailgun_domain : "simplyflourish.space"
     const fromEmail = useUserConfig ? userInt.mailgun_from_email : "noreply@simplyflourish.space"
+    // Defaulting to US if not specified
     const region = (useUserConfig ? userInt.mailgun_region : process.env.MAILGUN_REGION) || "US"
 
-    // Safe logging for debugging (no API key exposed)
-    console.log(`[v0] [Mailgun] Config: ${useUserConfig ? "USER_DB" : "ENV_GLOBAL"} | Domain: ${domain} | Region: ${region} | From: ${fromEmail}`)
-    console.log(`[v0] [Mailgun] Attempting to send to: ${to} | Subject: ${subject?.substring(0, 50)}...`)
+    console.log(`[Mailgun] Config: ${useUserConfig ? "USER_DB" : "ENV_GLOBAL"} | Domain: ${domain} | Region: ${region}`)
 
     if (!apiKey || !domain || !fromEmail) {
-      console.error(`[Mailgun] Missing config - apiKey: ${!!apiKey}, domain: ${!!domain}, fromEmail: ${!!fromEmail}`)
       return NextResponse.json({ 
         error: "Mailgun not configured properly",
         details: `Missing: ${!apiKey ? "apiKey " : ""}${!domain ? "domain " : ""}${!fromEmail ? "fromEmail" : ""}`.trim()
       }, { status: 500 })
     }
 
-    // 3. Set correct Base URL based on resolved region
-    const baseUrl = region.toUpperCase() === "US" 
+    // 3. Set correct Base URL (Fixed Syntax)
+    const baseUrl = region.toUpperCase() === "EU" 
+      ? "https://api.eu.mailgun.net" 
       : "https://api.mailgun.net"
     
     const mailgunUrl = `${baseUrl}/v3/${domain}/messages`
     
-    // 4. Use Buffer.from for Node.js compatibility + URLSearchParams for proper format
+    // 4. Execute Fetch
     const response = await fetch(mailgunUrl, {
       method: "POST",
       headers: {
@@ -67,59 +65,31 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    // 5. Enhanced error reporting - return exact Mailgun error
     if (!response.ok) {
       const errorText = await response.text()
-      let errorMessage = "Mailgun rejected request"
-      
-      // Try to parse Mailgun's JSON error response
-      try {
-        const errorJson = JSON.parse(errorText)
-        errorMessage = errorJson.message || errorText
-      } catch {
-        errorMessage = errorText
-      }
-      
-      console.error(`[v0] [Mailgun Error] Status: ${response.status} | Domain: ${domain} | Region: ${region} | Message: ${errorMessage}`)
-      console.error(`[v0] [Mailgun Error] Full response: ${errorText}`)
-      
-      // Common Mailgun error explanations
-      let explanation = ""
-      if (response.status === 401) {
-        explanation = "API key invalid or unauthorized. Check MAILGUN_API_KEY."
-      } else if (response.status === 404) {
-        explanation = "Domain not found. Verify domain is added and verified in Mailgun."
-      } else if (response.status === 400) {
-        explanation = "Bad request - check sender email format or domain DNS."
-      } else if (response.status === 403) {
-        explanation = "Forbidden - domain may need verification or sender authorization."
-      }
+      console.error(`[Mailgun Error] Status: ${response.status} | Message: ${errorText}`)
       
       return NextResponse.json({ 
-        error: errorMessage,
-        explanation,
+        error: errorText,
         status: response.status,
         domain,
-        region,
-        to,
-        from: fromEmail,
       }, { status: response.status })
     }
 
     const result = await response.json()
 
-    // 6. Log to email_messages table with the actual fromEmail used
+    // 5. Log to database
     const { data: tenantUser } = await supabase
       .from("tenant_users")
       .select("tenant_id")
       .eq("user_id", user.id)
       .single()
 
-    const { error: logError } = await supabase.from("email_messages").insert({
+    await supabase.from("email_messages").insert({
       tenant_id: tenantUser?.tenant_id,
       contact_id: contactId || null,
       message_id: result.id,
-      from_email: fromEmail, // Uses the actual fromEmail that was sent
+      from_email: fromEmail,
       to_email: to,
       subject: subject,
       body_plain: text,
@@ -128,24 +98,11 @@ export async function POST(request: NextRequest) {
       status: "sent",
       sent_at: new Date().toISOString(),
     })
-    
-    if (logError) {
-      console.error("[v0] Failed to log email to database:", logError)
-      // Don't fail the request - email was sent successfully
-    }
 
-    console.log(`[Mailgun] Email sent successfully | ID: ${result.id} | To: ${to}`)
     return NextResponse.json({ success: true, messageId: result.id })
+
   } catch (error: any) {
-    const debugObject = {
-      errorName: error.name,
-      errorMessage: error.message,
-      errorStack: error.stack?.split("\n").slice(0, 3).join("\n"),
-    }
-    console.error("[Mailgun] Server error:", debugObject)
-    return NextResponse.json({ 
-      error: error.message || "Internal server error",
-      debug: debugObject 
-    }, { status: 500 })
+    console.error("[Mailgun] Server error:", error)
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 })
   }
 }
