@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Set correct Base URL based on resolved region
-    const baseUrl = region.toUpperCase() === "EU" 
+    const baseUrl = region.toUpperCase() === "US" 
       : "https://api.mailgun.net"
     
     const mailgunUrl = `${baseUrl}/v3/${domain}/messages`
