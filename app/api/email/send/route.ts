@@ -3,53 +3,41 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Initialize Supabase
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
     
-    if (!user) {
+    // Check if user is logged in
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
     const { to, subject, text, html, contactId } = body
 
-    if (!to || !subject || (!text && !html)) {
-      return NextResponse.json({ error: "Missing required fields: to, subject, and text or html" }, { status: 400 })
-    }
-
-    // 1. Fetch User Integration settings
+    // 2. Fetch User Integration settings
     const { data: userInt } = await supabase
       .from("user_integrations")
-      .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled, mailgun_region")
+      .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled")
       .eq("user_id", user.id)
       .single()
 
-    // 2. Credential Prioritization
+    // 3. Prioritize Credentials (Using your US-based logic)
     const useUserConfig = !!(userInt?.mailgun_enabled && userInt?.mailgun_api_key)
     
     const apiKey = useUserConfig ? userInt.mailgun_api_key : process.env.MAILGUN_API_KEY
     const domain = useUserConfig ? userInt.mailgun_domain : "simplyflourish.space"
     const fromEmail = useUserConfig ? userInt.mailgun_from_email : "noreply@simplyflourish.space"
-    // Defaulting to US if not specified
-    const region = (useUserConfig ? userInt.mailgun_region : process.env.MAILGUN_REGION) || "US"
 
-    console.log(`[Mailgun] Config: ${useUserConfig ? "USER_DB" : "ENV_GLOBAL"} | Domain: ${domain} | Region: ${region}`)
+    // US API Endpoint
+    const mailgunUrl = `https://api.mailgun.net/v3/${domain}/messages`
 
-    if (!apiKey || !domain || !fromEmail) {
-      return NextResponse.json({ 
-        error: "Mailgun not configured properly",
-        details: `Missing: ${!apiKey ? "apiKey " : ""}${!domain ? "domain " : ""}${!fromEmail ? "fromEmail" : ""}`.trim()
-      }, { status: 500 })
+    if (!apiKey || !domain) {
+      return NextResponse.json({ error: "Mailgun credentials missing" }, { status: 500 })
     }
 
-    // 3. Set correct Base URL (Fixed Syntax)
-    const baseUrl = region.toUpperCase() === "EU" 
-      ? "https://api.eu.mailgun.net" 
-      : "https://api.mailgun.net"
-    
-    const mailgunUrl = `${baseUrl}/v3/${domain}/messages`
-    
-    // 4. Execute Fetch
+    // 4. Send the Email
     const response = await fetch(mailgunUrl, {
       method: "POST",
       headers: {
@@ -67,42 +55,14 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`[Mailgun Error] Status: ${response.status} | Message: ${errorText}`)
-      
-      return NextResponse.json({ 
-        error: errorText,
-        status: response.status,
-        domain,
-      }, { status: response.status })
+      return NextResponse.json({ error: errorText }, { status: response.status })
     }
 
     const result = await response.json()
-
-    // 5. Log to database
-    const { data: tenantUser } = await supabase
-      .from("tenant_users")
-      .select("tenant_id")
-      .eq("user_id", user.id)
-      .single()
-
-    await supabase.from("email_messages").insert({
-      tenant_id: tenantUser?.tenant_id,
-      contact_id: contactId || null,
-      message_id: result.id,
-      from_email: fromEmail,
-      to_email: to,
-      subject: subject,
-      body_plain: text,
-      body_html: html,
-      direction: "outbound",
-      status: "sent",
-      sent_at: new Date().toISOString(),
-    })
-
     return NextResponse.json({ success: true, messageId: result.id })
 
   } catch (error: any) {
-    console.error("[Mailgun] Server error:", error)
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 })
+    console.error("[Mailgun] Error:", error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
