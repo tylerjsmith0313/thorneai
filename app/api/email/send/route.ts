@@ -17,23 +17,14 @@ export async function POST(request: NextRequest) {
     const { to, subject, text, html, contactId } = body
 
     // 2. Fetch User Integration settings
- const response = await fetch(mailgunUrl, {
-  method: "POST",
-  headers: {
-    // This MUST be "api:your-key" encoded in base64
-    Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`,
-    "Content-Type": "application/x-www-form-urlencoded",
-  },
-  body: new URLSearchParams({
-    from: fromEmail,
-    to: to,
-    subject: subject,
-    text: text || "",
-    html: html || "",
-  }),
-});
+    // Note: Ensure you define 'userInt' by fetching it from your database here
+    const { data: userInt } = await supabase
+      .from("user_integrations")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
 
-    // 3. Prioritize Credentials (Using your US-based logic)
+    // 3. Prioritize Credentials & Define Variables FIRST
     const useUserConfig = !!(userInt?.mailgun_enabled && userInt?.mailgun_api_key)
     
     const apiKey = useUserConfig ? userInt.mailgun_api_key : process.env.MAILGUN_API_KEY
@@ -47,24 +38,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Mailgun credentials missing" }, { status: 500 })
     }
 
-    // 4. Send the Email
+    // 4. Send the Email 
+    // We only use 'const response' once here to avoid the "defined multiple times" error
     const response = await fetch(mailgunUrl, {
       method: "POST",
       headers: {
+        // Correctly formatted Basic Auth for Mailgun
         Authorization: `Basic ${Buffer.from("api:" + apiKey).toString("base64")}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
         from: fromEmail,
-        to,
-        subject,
+        to: to,
+        subject: subject,
         text: text || "",
         html: html || "",
       }),
     })
 
+    // 5. Handle the Response
     if (!response.ok) {
       const errorText = await response.text()
+      console.error("[Mailgun] API Error:", errorText)
       return NextResponse.json({ error: errorText }, { status: response.status })
     }
 
@@ -72,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, messageId: result.id })
 
   } catch (error: any) {
-    console.error("[Mailgun] Error:", error.message)
+    console.error("[Mailgun] Catch Error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
