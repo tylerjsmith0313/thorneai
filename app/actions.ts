@@ -151,7 +151,7 @@ export async function createDealAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "null"
+  const userId = user?.id || null
 
   const { data, error } = await supabase
     .from("deals")
@@ -212,7 +212,7 @@ export async function updateDealStatusAction(
 
   // Log activity
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "null"
+  const userId = user?.id || null
   await supabase.from("activities").insert({
     user_id: userId,
     deal_id: id,
@@ -233,7 +233,7 @@ export async function createConversationAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "null"
+  const userId = user?.id || null
 
   const { data, error } = await supabase
     .from("conversations")
@@ -320,7 +320,7 @@ export async function createProductAction(formData: {
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "null"
+  const userId = user?.id || null
 
   const { data, error } = await supabase
     .from("products")
@@ -360,7 +360,7 @@ export async function bulkImportContactsAction(
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id || "null"
+  const userId = user?.id || null
 
   const contactsToInsert = contacts.map((c) => ({
     user_id: userId,
@@ -395,4 +395,30 @@ export async function bulkImportContactsAction(
 
   revalidatePath("/")
   return { data, count: data?.length || 0 }
+}
+
+// CONTACT FORM SUBMISSION ACTION
+export async function submitContactFormAction(formData: {
+  fullName: string
+  email: string
+  message: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .insert({
+      full_name: formData.fullName,
+      email: formData.email,
+      message: formData.message,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[v0] Error submitting contact form:", error)
+    return { error: error.message, success: false }
+  }
+
+  return { data, success: true }
 }

@@ -1,6 +1,6 @@
 {
   "name": "thorne-neural-core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "build": "next build",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.59",
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -75,5 +76,10 @@
     "postcss": "8.5.6",
     "tailwindcss": "^4.1.9",
     "typescript": "~5.8.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
   }
 }

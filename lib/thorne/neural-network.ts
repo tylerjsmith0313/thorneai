@@ -1,6 +1,15 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import type {
+  AnalyticsTimeframe,
+  MetricDataPoint,
+  DashboardMetrics,
+  ContactAnalytics,
+  RevenueAnalytics,
+  ConversationAnalytics,
+  AIReadyData,
+} from "./types"
 
 /**
  * THORNE NEURAL NETWORK
@@ -13,82 +22,6 @@ import { createClient } from "@/lib/supabase/server"
  * - Data collection
  * - Data structuring for AI purposes
  */
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface AnalyticsTimeframe {
-  start: Date
-  end: Date
-  granularity: 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year'
-}
-
-export interface MetricDataPoint {
-  timestamp: string
-  value: number
-  label?: string
-}
-
-export interface DashboardMetrics {
-  totalContacts: number
-  activeContacts: number
-  newContactsThisPeriod: number
-  contactGrowthRate: number
-  totalOpportunities: number
-  openOpportunities: number
-  wonOpportunities: number
-  lostOpportunities: number
-  totalPipelineValue: number
-  wonRevenue: number
-  averageDealSize: number
-  winRate: number
-  totalConversations: number
-  activeConversations: number
-  responseRate: number
-  averageResponseTime: number
-  engagementScore: number
-  heatScore: number
-}
-
-export interface ContactAnalytics {
-  totalCount: number
-  byStatus: Record<string, number>
-  bySource: Record<string, number>
-  byIndustry: Record<string, number>
-  engagementDistribution: { low: number; medium: number; high: number }
-  growthTrend: MetricDataPoint[]
-  topEngaged: Array<{ id: string; name: string; score: number }>
-}
-
-export interface RevenueAnalytics {
-  totalRevenue: number
-  projectedRevenue: number
-  averageDealSize: number
-  revenueByMonth: MetricDataPoint[]
-  revenueByProduct: Array<{ product: string; revenue: number; count: number }>
-  revenueByStage: Record<string, number>
-  forecastAccuracy: number
-}
-
-export interface ConversationAnalytics {
-  totalConversations: number
-  byChannel: Record<string, number>
-  byStatus: Record<string, number>
-  responseTimeAvg: number
-  messagesPerConversation: number
-  conversionRate: number
-  sentimentDistribution: { positive: number; neutral: number; negative: number }
-}
-
-export interface AIReadyData {
-  context: string
-  entities: Array<{ type: string; value: string; confidence: number }>
-  relationships: Array<{ from: string; to: string; type: string }>
-  insights: string[]
-  recommendations: string[]
-  structuredData: Record<string, unknown>
-}
 
 // ============================================================================
 // THORNE NEURAL NETWORK CLASS
@@ -654,30 +587,30 @@ interface Activity {
   created_at: string
 }
 
-// Export singleton instance
-export const thorneNeuralNetwork = ThorneNeuralNetwork.getInstance()
+// Singleton instance (not exported - "use server" files can only export async functions)
+const thorneNeuralNetwork = ThorneNeuralNetwork.getInstance()
 
 // Export convenience functions
-export const getDashboardMetrics = (timeframe?: AnalyticsTimeframe) => 
+export const getDashboardMetrics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getDashboardMetrics(timeframe)
 
-export const getContactAnalytics = (timeframe?: AnalyticsTimeframe) => 
+export const getContactAnalytics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getContactAnalytics(timeframe)
 
-export const getRevenueAnalytics = (timeframe?: AnalyticsTimeframe) => 
+export const getRevenueAnalytics = async (timeframe?: AnalyticsTimeframe) => 
   thorneNeuralNetwork.getRevenueAnalytics(timeframe)
 
-export const getConversationAnalytics = () => 
+export const getConversationAnalytics = async () => 
   thorneNeuralNetwork.getConversationAnalytics()
 
-export const structureDataForAI = (contextType: 'contact' | 'opportunity' | 'conversation' | 'full', entityId?: string) => 
+export const structureDataForAI = async (contextType: 'contact' | 'opportunity' | 'conversation' | 'full', entityId?: string) => 
   thorneNeuralNetwork.structureDataForAI(contextType, entityId)
 
-export const generateReport = (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
+export const generateReport = async (reportType: 'daily' | 'weekly' | 'monthly' | 'custom', options?: {
   startDate?: Date
   endDate?: Date
   includeCharts?: boolean
 }) => thorneNeuralNetwork.generateReport(reportType, options)
 
-export const aggregatePerformanceData = () => 
+export const aggregatePerformanceData = async () => 
   thorneNeuralNetwork.aggregatePerformanceData()

@@ -1,0 +1,20 @@
+{
+  "node": {
+    "40427eaeb8149b2f0b9d0d1a1d8c605fb77298849d": {
+      "workers": {
+        "app/auth/sign-up/page": {
+          "moduleId": 95643,
+          "async": false,
+          "exportedName": "createSignupCheckoutSession",
+          "filename": "app/actions/signup-checkout.ts"
+        }
+      },
+      "layer": {
+        "app/auth/sign-up/page": "action-browser"
+      },
+      "exportedName": "createSignupCheckoutSession",
+      "filename": "app/actions/signup-checkout.ts"
+    }
+  },
+  "edge": {}
+}

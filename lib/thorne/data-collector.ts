@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import type { DataEvent, DataIngestionResult } from "./types"
 
 /**
  * THORNE DATA COLLECTOR
@@ -8,21 +9,6 @@ import { createClient } from "@/lib/supabase/server"
  * Handles real-time data collection, event tracking, and data ingestion
  * for the Thorne Neural Network.
  */
-
-export interface DataEvent {
-  eventType: string
-  entityType: 'contact' | 'opportunity' | 'conversation' | 'activity' | 'user'
-  entityId: string
-  action: string
-  metadata?: Record<string, unknown>
-  timestamp?: string
-}
-
-export interface DataIngestionResult {
-  success: boolean
-  recordsProcessed: number
-  errors?: string[]
-}
 
 // ============================================================================
 // EVENT TRACKING

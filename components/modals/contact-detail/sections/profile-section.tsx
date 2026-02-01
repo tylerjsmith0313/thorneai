@@ -5,13 +5,14 @@ import React from "react"
 import { useState, useEffect } from "react"
 import { 
   Mail, Phone, Globe, Building2, MapPin, Linkedin, Twitter, Instagram, Facebook, Youtube, Share2,
-  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle, User, Users
+  Smartphone, Gift, Send, Sparkles, RefreshCw, ChevronDown, ChevronUp, Pencil, Check, BrainCircuit, Zap, AlertCircle, User, Users, X, Loader2
 } from "lucide-react"
 import type { Contact } from "@/types"
 import { ThorneInsightBox } from "../common/thorne-insight-box"
 import { BaseButton } from "@/components/ui/base-button"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { toast } from "sonner"
 
 interface TenantUser {
   id: string
@@ -31,6 +32,7 @@ function extractDomain(email: string | null | undefined): string | null {
 
 interface ProfileSectionProps {
   contact: Contact
+  onContactUpdate?: (updatedContact: Contact) => void
 }
 
 const outreachChannels = [
@@ -42,7 +44,7 @@ const outreachChannels = [
   { id: "Direct Visit", icon: MapPin, requiresAddress: true },
 ]
 
-export function ProfileSection({ contact }: ProfileSectionProps) {
+export function ProfileSection({ contact, onContactUpdate }: ProfileSectionProps) {
   const [isEditingChannels, setIsEditingChannels] = useState(false)
   const [selectedChannels, setSelectedChannels] = useState<string[]>(["Email", "LinkedIn"])
   const [budget, setBudget] = useState(100)
@@ -56,7 +58,89 @@ export function ProfileSection({ contact }: ProfileSectionProps) {
   const [showAssignDropdown, setShowAssignDropdown] = useState(false)
   const [loadingUsers, setLoadingUsers] = useState(false)
   
+  // Profile editing state
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editForm, setEditForm] = useState({
+    email: contact.email || "",
+    phone: contact.phone || "",
+    company: contact.company || "",
+    jobTitle: contact.jobTitle || "",
+    streetAddress: contact.streetAddress || contact.address || (contact as any).street_address || "",
+    city: contact.city || "",
+    state: contact.state || "",
+    zipCode: contact.zipCode || "",
+    country: contact.country || "",
+  })
+  
   const supabase = createClient()
+  
+  // Handle profile save
+  async function handleSaveProfile() {
+    setIsSaving(true)
+    try {
+      const { error } = await supabase
+        .from("contacts")
+        .update({
+          email: editForm.email || null,
+          phone: editForm.phone || null,
+          company: editForm.company || null,
+          job_title: editForm.jobTitle || null,
+          street_address: editForm.streetAddress || null,
+          city: editForm.city || null,
+          state: editForm.state || null,
+          zip_code: editForm.zipCode || null,
+          country: editForm.country || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", contact.id)
+      
+      if (error) {
+        console.error("[v0] Failed to update contact:", error)
+        toast.error("Failed to save changes: " + error.message)
+      } else {
+        toast.success("Contact updated successfully!")
+        setIsEditingProfile(false)
+        
+        // Notify parent of update
+        if (onContactUpdate) {
+          onContactUpdate({
+            ...contact,
+            email: editForm.email,
+            phone: editForm.phone,
+            company: editForm.company,
+            jobTitle: editForm.jobTitle,
+            streetAddress: editForm.streetAddress,
+            city: editForm.city,
+            state: editForm.state,
+            zipCode: editForm.zipCode,
+            country: editForm.country,
+          })
+        }
+      }
+    } catch (err) {
+      console.error("[v0] Error saving profile:", err)
+      toast.error("An error occurred while saving")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  
+  // Cancel editing
+  function handleCancelEdit() {
+    setEditForm({
+      email: contact.email || "",
+      phone: contact.phone || "",
+      company: contact.company || "",
+      jobTitle: contact.jobTitle || "",
+      streetAddress: contact.streetAddress || contact.address || (contact as any).street_address || "",
+      city: contact.city || "",
+      state: contact.state || "",
+      zipCode: contact.zipCode || "",
+      country: contact.country || "",
+    })
+    setIsEditingProfile(false)
+  }
 
   // Load team users filtered by contact's company email domain
   useEffect(() => {
@@ -180,17 +264,73 @@ ${hasAddress ? `4. **Physical Touchpoint**
       <div className="bg-white border border-slate-200 rounded-[32px] p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Verified Information</h4>
-          <button className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-white hover:text-indigo-600 transition-all">
-            Edit
-          </button>
+          {isEditingProfile ? (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-white hover:text-rose-600 transition-all flex items-center gap-1"
+              >
+                <X size={12} />
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveProfile}
+                disabled={isSaving}
+                className="px-3 py-1.5 bg-indigo-600 border border-indigo-600 rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-1"
+              >
+                {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                {isSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsEditingProfile(true)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-white hover:text-indigo-600 transition-all flex items-center gap-1"
+            >
+              <Pencil size={12} />
+              Edit
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-          <InfoItem label="Email" value={contact.email || "Not set"} icon={<Mail size={14} />} />
-          <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} />
-          <InfoItem label="Company" value={contact.company || "Not set"} icon={<Building2 size={14} />} />
-          <InfoItem label="Job Title" value={contact.jobTitle || "Not set"} icon={<Globe size={14} />} />
-        </div>
+        {isEditingProfile ? (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <EditableField 
+              label="Email" 
+              value={editForm.email} 
+              onChange={(v) => setEditForm(f => ({ ...f, email: v }))}
+              icon={<Mail size={14} />}
+              type="email"
+            />
+            <EditableField 
+              label="Phone" 
+              value={editForm.phone} 
+              onChange={(v) => setEditForm(f => ({ ...f, phone: v }))}
+              icon={<Phone size={14} />}
+              type="tel"
+            />
+            <EditableField 
+              label="Company" 
+              value={editForm.company} 
+              onChange={(v) => setEditForm(f => ({ ...f, company: v }))}
+              icon={<Building2 size={14} />}
+            />
+            <EditableField 
+              label="Job Title" 
+              value={editForm.jobTitle} 
+              onChange={(v) => setEditForm(f => ({ ...f, jobTitle: v }))}
+              icon={<Globe size={14} />}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+            <InfoItem label="Email" value={contact.email || "Not set"} icon={<Mail size={14} />} />
+            <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} href={contact.phone ? `tel:${contact.phone}` : undefined} />
+            <InfoItem label="Company" value={contact.company || "Not set"} icon={<Building2 size={14} />} />
+            <InfoItem label="Job Title" value={contact.jobTitle || "Not set"} icon={<Globe size={14} />} />
+          </div>
+        )}
 
         {/* Assigned To Section */}
         <div className="pt-5 border-t border-slate-100">
@@ -492,14 +632,24 @@ ${hasAddress ? `4. **Physical Touchpoint**
   )
 }
 
-function InfoItem({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function InfoItem({ label, value, icon, href }: { label: string; value: string; icon: React.ReactNode; href?: string }) {
+  const content = (
+    <p className="text-[12px] font-semibold text-slate-800 flex items-center gap-2 transition-colors group-hover:text-indigo-600">
+      <span className="text-slate-300 group-hover:text-indigo-400 transition-colors">{icon}</span>
+      {value}
+    </p>
+  )
+
   return (
     <div className="space-y-1 group cursor-pointer">
       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em]">{label}</p>
-      <p className="text-[12px] font-semibold text-slate-800 flex items-center gap-2 transition-colors group-hover:text-indigo-600">
-        <span className="text-slate-300 group-hover:text-indigo-400 transition-colors">{icon}</span>
-        {value}
-      </p>
+      {href ? (
+        <a href={href} className="block">
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </div>
   )
 }
