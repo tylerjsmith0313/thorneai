@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * This function is what Next.js runs for every request handled by this proxy 
- * (previously called middleware).
- * * To fix the build error: 
- * 1. Ensure this file is named 'proxy.ts'
- * 2. Ensure it has a named "proxy" function export.
+ * Next.js 16 Proxy Configuration
+ * This replaces the deprecated middleware.ts convention.
+ * The function must be named 'proxy' for the build to pass.
  */
 export function proxy(request: NextRequest) {
-  // Add your custom logic here (e.g., checking session cookies, 
-  // blocking specific IPs, or rewriting paths).
-
-  // To simply allow the request to proceed:
+  // Add your logic here (e.g., Auth checks, redirects, or headers)
+  
+  // For now, we allow all requests to proceed to their destination
   return NextResponse.next();
 }
 
-// Optional: You can also use a matcher to limit where this runs
+/**
+ * The matcher allows you to filter which paths this proxy runs on.
+ * This configuration excludes static files and API routes to optimize performance.
+ */
 export const config = {
   matcher: [
     /*
