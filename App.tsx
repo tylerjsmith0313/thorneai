@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { 
-  ChevronDown, ChevronUp, LayoutDashboard, Search, Filter, MessageSquare, BookOpen, Calendar as CalendarIcon
+  ChevronDown, ChevronUp, LayoutDashboard, Search, Filter, MessageSquare, BookOpen, Calendar as CalendarIcon, X
 } from 'lucide-react';
 import { MOCK_DEALS, MOCK_CONTACTS, MOCK_CONVERSATIONS } from './constants.ts';
 import Header from './components/Header.tsx';
@@ -27,6 +27,7 @@ import ContactFinder from './components/ContactFinder.tsx';
 import RadarScan from './components/RadarScan.tsx';
 import BulkUpload from './components/BulkUpload.tsx';
 import Scanner from './components/Scanner.tsx';
+import AdminManagement from './components/control/sections/AdminManagement.tsx';
 
 // Atomic & Modular Imports
 import BaseButton from './components/ui/BaseButton.tsx';
@@ -44,7 +45,7 @@ import CalendarSection from './components/calendar/CalendarSection.tsx';
 // Auth Components
 import AuthFlow from './components/auth/AuthFlow.tsx';
 
-type ModalType = 'income' | 'opportunities' | 'contacts-added' | 'active-conversations' | 'withering' | 'break-ups' | 'dead-deals' | 'database' | 'control-center' | 'add-contact' | 'contact-finder' | 'radar-scan' | 'bulk-upload' | 'scanner' | null;
+type ModalType = 'income' | 'opportunities' | 'contacts-added' | 'active-conversations' | 'withering' | 'break-ups' | 'dead-deals' | 'database' | 'control-center' | 'admin-center' | 'add-contact' | 'contact-finder' | 'radar-scan' | 'bulk-upload' | 'scanner' | null;
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -159,6 +160,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-white flex flex-col selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
       <Header 
         onControlCenterClick={() => setActiveModal('control-center')} 
+        onAdminCenterClick={() => setActiveModal('admin-center')}
         onAddContactClick={() => {
           setPrefilledLeadData(null);
           setActiveModal('add-contact');
@@ -238,6 +240,21 @@ const App: React.FC = () => {
       {activeModal === 'dead-deals' && <DeadDealsBreakdown deals={MOCK_DEALS} onClose={() => setActiveModal(null)} />}
       {activeModal === 'database' && <DatabaseBreakdown contacts={MOCK_CONTACTS} onClose={() => setActiveModal(null)} />}
       {activeModal === 'control-center' && <ControlCenter onClose={() => setActiveModal(null)} />}
+      {activeModal === 'admin-center' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setActiveModal(null)} />
+          <div className="bg-white w-full max-w-6xl h-full max-h-[85vh] rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col animate-in zoom-in-95 duration-300">
+             <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+                <div className="flex justify-end mb-4">
+                  <button onClick={() => setActiveModal(null)} className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 transition-all border border-slate-100 hover:text-rose-500">
+                    <X size={24} />
+                  </button>
+                </div>
+                <AdminManagement />
+             </div>
+          </div>
+        </div>
+      )}
       {activeModal === 'add-contact' && <AddContactWizard onClose={() => setActiveModal(null)} initialData={prefilledLeadData} />}
       {activeModal === 'contact-finder' && <ContactFinder onClose={() => setActiveModal(null)} onVerify={handleLeadVerification} />}
       {activeModal === 'radar-scan' && <RadarScan onClose={() => setActiveModal(null)} onSelect={(poi) => handleLeadVerification({ company: poi.title })} />}

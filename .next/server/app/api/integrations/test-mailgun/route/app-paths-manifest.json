@@ -1,0 +1,3 @@
+{
+  "/api/integrations/test-mailgun/route": "app/api/integrations/test-mailgun/route.js"
+}
