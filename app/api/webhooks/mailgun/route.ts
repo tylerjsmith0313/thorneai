@@ -8,6 +8,94 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Levenshtein distance for fuzzy string matching
+function levenshteinDistance(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase()
+  const s2 = str2.toLowerCase()
+  const m = s1.length
+  const n = s2.length
+  
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0))
+  
+  for (let i = 0; i <= m; i++) dp[i][0] = i
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1]
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+      }
+    }
+  }
+  return dp[m][n]
+}
+
+// Calculate similarity score (0 to 1, where 1 is exact match)
+function nameSimilarity(name1: string, name2: string): number {
+  if (!name1 || !name2) return 0
+  const maxLen = Math.max(name1.length, name2.length)
+  if (maxLen === 0) return 1
+  const distance = levenshteinDistance(name1, name2)
+  return 1 - distance / maxLen
+}
+
+// Find contact by fuzzy name matching
+async function findContactByFuzzyName(senderName: string, senderEmail: string): Promise<{ id: string; tenant_id: string } | null> {
+  // Parse sender name into parts
+  const nameParts = senderName.split(/\s+/).filter(Boolean)
+  const firstName = nameParts[0] || ""
+  const lastName = nameParts.slice(1).join(" ") || ""
+  
+  // Extract domain from email for additional matching
+  const emailDomain = senderEmail?.split("@")[1]?.toLowerCase()
+  
+  // Search for contacts with similar names
+  const { data: candidates } = await supabase
+    .from("contacts")
+    .select("id, tenant_id, first_name, last_name, company, email")
+    .or(`first_name.ilike.%${firstName.substring(0, 3)}%,last_name.ilike.%${lastName.substring(0, 3)}%`)
+    .limit(50)
+  
+  if (!candidates || candidates.length === 0) return null
+  
+  // Score each candidate
+  const scored = candidates.map(contact => {
+    const contactFullName = `${contact.first_name || ""} ${contact.last_name || ""}`.trim()
+    const fullNameScore = nameSimilarity(senderName, contactFullName)
+    
+    // Individual name part scores
+    const firstNameScore = nameSimilarity(firstName, contact.first_name || "")
+    const lastNameScore = nameSimilarity(lastName, contact.last_name || "")
+    
+    // Domain matching bonus (same company domain)
+    const contactDomain = contact.email?.split("@")[1]?.toLowerCase()
+    const domainBonus = contactDomain && emailDomain && contactDomain === emailDomain ? 0.2 : 0
+    
+    // Combined score with weights
+    const score = Math.max(
+      fullNameScore,
+      (firstNameScore * 0.4 + lastNameScore * 0.6) // Weight last name higher
+    ) + domainBonus
+    
+    return { contact, score }
+  })
+  
+  // Sort by score descending and get best match
+  scored.sort((a, b) => b.score - a.score)
+  const bestMatch = scored[0]
+  
+  // Only return if score is above threshold (0.7 = 70% similar)
+  if (bestMatch && bestMatch.score >= 0.7) {
+    console.log(`[v0] Fuzzy name match: "${senderName}" matched to "${bestMatch.contact.first_name} ${bestMatch.contact.last_name}" (score: ${bestMatch.score.toFixed(2)})`)
+    return { id: bestMatch.contact.id, tenant_id: bestMatch.contact.tenant_id }
+  }
+  
+  console.log(`[v0] No fuzzy match found for "${senderName}" (best score: ${bestMatch?.score.toFixed(2) || 0})`)
+  return null
+}
+
 // Verify Mailgun webhook signature
 function verifyMailgunSignature(
   timestamp: string,
@@ -170,16 +258,22 @@ async function handleIncomingEmail(payload: Record<string, string>) {
     subject: emailData.subject,
   })
 
-  // Extract sender email address
-  const senderMatch = emailData.from?.match(/<([^>]+)>/) || [null, emailData.from]
-  const senderEmail = senderMatch[1] || emailData.from
+  // Extract sender email and name
+  const senderMatch = emailData.from?.match(/^(?:"?([^"<]+)"?\s*)?<?([^>]+)>?$/)
+  const senderName = senderMatch?.[1]?.trim() || ""
+  const senderEmail = senderMatch?.[2]?.trim() || emailData.from
 
-  // Find the contact by email (using tenant-based schema)
-  const { data: contact } = await supabase
+  // Find the contact by email first (using tenant-based schema)
+  let { data: contact } = await supabase
     .from("contacts")
     .select("id, tenant_id")
     .eq("email", senderEmail?.toLowerCase())
     .single()
+
+  // If no exact email match and we have a sender name, try fuzzy name matching
+  if (!contact && senderName) {
+    contact = await findContactByFuzzyName(senderName, senderEmail)
+  }
 
   // Store the incoming email in the database (using tenant-based schema)
   const { data: storedEmail, error: storeError } = await supabase
