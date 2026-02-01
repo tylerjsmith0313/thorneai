@@ -17,11 +17,21 @@ export async function POST(request: NextRequest) {
     const { to, subject, text, html, contactId } = body
 
     // 2. Fetch User Integration settings
-    const { data: userInt } = await supabase
-      .from("user_integrations")
-      .select("mailgun_api_key, mailgun_domain, mailgun_from_email, mailgun_enabled")
-      .eq("user_id", user.id)
-      .single()
+ const response = await fetch(mailgunUrl, {
+  method: "POST",
+  headers: {
+    // This MUST be "api:your-key" encoded in base64
+    Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  },
+  body: new URLSearchParams({
+    from: fromEmail,
+    to: to,
+    subject: subject,
+    text: text || "",
+    html: html || "",
+  }),
+});
 
     // 3. Prioritize Credentials (Using your US-based logic)
     const useUserConfig = !!(userInt?.mailgun_enabled && userInt?.mailgun_api_key)
