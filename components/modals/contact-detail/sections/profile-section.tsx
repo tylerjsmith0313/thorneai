@@ -326,7 +326,7 @@ ${hasAddress ? `4. **Physical Touchpoint**
         ) : (
           <div className="grid grid-cols-2 gap-x-8 gap-y-5">
             <InfoItem label="Email" value={contact.email || "Not set"} icon={<Mail size={14} />} />
-            <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} />
+            <InfoItem label="Phone" value={contact.phone || "Not set"} icon={<Phone size={14} />} href={contact.phone ? `tel:${contact.phone}` : undefined} />
             <InfoItem label="Company" value={contact.company || "Not set"} icon={<Building2 size={14} />} />
             <InfoItem label="Job Title" value={contact.jobTitle || "Not set"} icon={<Globe size={14} />} />
           </div>
@@ -632,14 +632,24 @@ ${hasAddress ? `4. **Physical Touchpoint**
   )
 }
 
-function InfoItem({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function InfoItem({ label, value, icon, href }: { label: string; value: string; icon: React.ReactNode; href?: string }) {
+  const content = (
+    <p className="text-[12px] font-semibold text-slate-800 flex items-center gap-2 transition-colors group-hover:text-indigo-600">
+      <span className="text-slate-300 group-hover:text-indigo-400 transition-colors">{icon}</span>
+      {value}
+    </p>
+  )
+
   return (
     <div className="space-y-1 group cursor-pointer">
       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em]">{label}</p>
-      <p className="text-[12px] font-semibold text-slate-800 flex items-center gap-2 transition-colors group-hover:text-indigo-600">
-        <span className="text-slate-300 group-hover:text-indigo-400 transition-colors">{icon}</span>
-        {value}
-      </p>
+      {href ? (
+        <a href={href} className="block">
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </div>
   )
 }
