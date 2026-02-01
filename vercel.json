@@ -2,7 +2,25 @@
   "crons": [
     {
       "path": "/api/cron/automations",
-      "schedule": "0 0 * * *" 
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/wp-admin/(.*)",
+      "destination": "/wp-admin/$1"
+    },
+    {
+      "source": "/wp-login.php",
+      "destination": "/wp-login.php"
+    },
+    {
+      "source": "/wp-content/(.*)",
+      "destination": "/wp-content/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }
