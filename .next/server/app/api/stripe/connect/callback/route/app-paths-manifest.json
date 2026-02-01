@@ -1,0 +1,3 @@
+{
+  "/api/stripe/connect/callback/route": "app/api/stripe/connect/callback/route.js"
+}

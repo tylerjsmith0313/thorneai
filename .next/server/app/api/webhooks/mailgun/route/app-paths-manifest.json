@@ -1,0 +1,3 @@
+{
+  "/api/webhooks/mailgun/route": "app/api/webhooks/mailgun/route.js"
+}
