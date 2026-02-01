@@ -59,3 +59,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+// Ensure line 63 looks exactly like this:
+console.error("[Mailgun API Error]:", errorText);
