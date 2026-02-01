@@ -5,17 +5,18 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { 
   Send, Sparkles, Bot, User as UserIcon, 
-  Loader2, ExternalLink, Zap, MessageCircle
+  Loader2, ExternalLink, Zap, MessageCircle, Mail
 } from "lucide-react"
 import type { Contact } from "@/types"
 import { ConversationEngineModal } from "./conversation-engine-modal"
 import { WidgetChatPanel } from "./widget-chat-panel"
+import { EmailsPanel } from "./emails-panel"
 
 interface ChatSectionProps {
   contact: Contact
 }
 
-type ChatTab = "assistant" | "widget"
+type ChatTab = "assistant" | "widget" | "emails"
 
 export function ChatSection({ contact }: ChatSectionProps) {
   const [activeTab, setActiveTab] = useState<ChatTab>("assistant")
@@ -121,11 +122,27 @@ export function ChatSection({ contact }: ChatSectionProps) {
           <MessageCircle size={16} />
           Website Chats
         </button>
+        <button
+          onClick={() => setActiveTab("emails")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            activeTab === "emails"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Mail size={16} />
+          Emails
+        </button>
       </div>
 
       {/* Widget Chat Panel */}
       {activeTab === "widget" && (
         <WidgetChatPanel contact={contact} />
+      )}
+
+      {/* Emails Panel */}
+      {activeTab === "emails" && (
+        <EmailsPanel contact={contact} />
       )}
 
       {/* AI Assistant Panel */}
