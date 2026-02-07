@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const SESSION_TIMEOUT_MINUTES = 15
@@ -13,24 +13,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
-  let supabaseResponse = NextResponse.next({ request })
+  const supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll()
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        )
-        supabaseResponse = NextResponse.next({ request })
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options),
-        )
-      },
-    },
-  })
+  const supabase = createClient(url, key)
 
   const {
     data: { user },

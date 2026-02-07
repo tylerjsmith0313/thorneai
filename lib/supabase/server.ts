@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -23,27 +22,8 @@ export async function createClient() {
         upsert: () => ({ data: null, error: { message: 'Supabase not configured' } }),
       }),
       _isConfigured: false,
-    } as unknown as ReturnType<typeof createServerClient>
+    } as unknown as SupabaseClient
   }
 
-  const cookieStore = await cookies()
-
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          )
-        } catch {
-          // The "setAll" method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
-      },
-    },
-  })
+  return createSupabaseClient(url, key)
 }

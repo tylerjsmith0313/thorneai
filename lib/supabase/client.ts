@@ -1,6 +1,6 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType<typeof createBrowserClient> | null = null
+let client: SupabaseClient | null = null
 
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -26,11 +26,11 @@ export function createClient() {
         upsert: () => ({ data: null, error: mockError }),
         eq: () => ({ data: null, error: mockError, single: () => ({ data: null, error: mockError }) }),
       }),
-    } as unknown as ReturnType<typeof createBrowserClient>
+    } as unknown as SupabaseClient
   }
 
   if (!client) {
-    client = createBrowserClient(url, key)
+    client = createSupabaseClient(url, key)
   }
 
   return client
