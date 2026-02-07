@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
+console.log('[v0] App.tsx reloading - components should be found');
 import LoginScreen from './LoginScreen';
 import { IncomeBreakdown } from './components/earned-income/IncomeBreakdown';
 import { OpportunitiesPipeline } from './components/opportunities-pipeline/OpportunitiesPipeline';
