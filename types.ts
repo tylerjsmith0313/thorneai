@@ -1,180 +1,145 @@
-// Application types for UI components (camelCase for frontend)
-// These are separate from database types which use snake_case
 
-export type ContactStatus = 'New' | 'Hot' | 'Withering' | 'Dead' | 'Needs Update' | 'Retouch' | 'Recapture'
-export type DealStatus = 'open' | 'closed-won' | 'closed-lost'
-export type ConversationStatus = 'awaiting_reply' | 'responded' | 'thorne_handling'
-export type ChannelType = 'SMS' | 'Email' | 'LinkedIn' | 'WhatsApp' | 'Phone'
-export type ActivityType = 'Human' | 'Thorne' | 'Gift' | 'System' | 'Update'
+import { ReactNode } from 'react';
 
-export interface Contact {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  company: string
-  jobTitle?: string
-  phone?: string
-  industry?: string
-  // Address fields (optional - required for physical outreach channels)
-  streetAddress?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  country?: string
-  // Company address (optional)
-  companyAddress?: string
-  // Social media
-  linkedinUrl?: string
-  twitterHandle?: string
-  instagramHandle?: string
-  facebookUrl?: string
-  youtubeUrl?: string
-  tiktokHandle?: string
-  websiteUrl?: string
-  // Profile/summary fields
-  interests?: string[]
-  hobbies?: string[]
-  notes?: string
-  demeanor?: string
-  communicationPace?: string
-  preferredChannel?: string
-  outreachBudget?: number
-  outreachChannels?: string[]
-  // Status fields
-  status: ContactStatus
-  source?: string
-  engagementScore?: number
-  isVerified?: boolean
-  addedDate: string
-  lastContactDate?: string
+export interface FeedCardData {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+  subValueLabel?: string;
+  accentColor: string;
 }
 
-export interface Deal {
-  id: string
-  contactId?: string
-  clientName: string
-  amount: number
-  status: DealStatus
-  isMonthlyRecurring: boolean
-  expectedCloseDate: string
-  actualCloseDate?: string
-  notes?: string
-  createdAt: string
-}
+// Fix: Added missing UserRole type for personnel categorization
+export type UserRole = 'Admin' | 'VP' | 'Director' | 'Manager' | 'User' | 'IT' | 'Marketing';
 
-export interface Conversation {
-  id: string
-  contactId: string
-  contactName: string
-  channel: ChannelType
-  status: ConversationStatus
-  unreadCount: number
-  lastMessage: string
-  lastActive: string
-  messages?: Message[]
-}
-
-export interface Message {
-  id: string
-  conversationId?: string
-  sender: 'user' | 'contact' | 'thorne'
-  text: string
-  timestamp: string
-  type?: 'text' | 'email' | 'sms' | 'call_transcript'
-  isRead?: boolean
-}
-
-export interface Product {
-  id: string
-  name: string
-  pitchContext?: string
-  classification: 'SaaS' | 'Service' | 'Physical' | 'Subscription' | 'Consulting'
-  retailPrice: number
-  cost?: number
-  volume: number
-  billingInterval: 'one-time' | 'monthly' | 'annual'
-  isDeployed: boolean
-}
-
-export interface KnowledgeSource {
-  id: string
-  name: string
-  type: 'pdf' | 'document' | 'url' | 'text'
-  sourceUrl?: string
-  content?: string
-  isActive: boolean
-}
-
-export interface Activity {
-  id: string
-  contactId?: string
-  dealId?: string
-  type: ActivityType | string
-  title: string
-  detail?: string
-  date: string
-  oldValue?: string
-  newValue?: string
-  icon?: string
-}
-
+// Fix: Added missing User interface for network hierarchy management
 export interface User {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  company?: string
-  jobTitle?: string
-  officePhone?: string
-  cellPhone?: string
-  avatarUrl?: string
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  permissions: UserRole;
+  parentId?: string;
 }
 
-export interface UserSettings {
-  id: string
-  userId: string
-  // AI Configuration
-  aiName?: string
-  aiDescription?: string
-  aiInstructions?: string
-  businessDescription?: string
-  aiGoals?: string
-  businessGoals?: string
-  personalGoals?: string
-  // Automation settings
-  autoAddResearch?: boolean
-  firstEngage?: boolean
-  nextStepNotifications?: boolean
-  responseCadence?: string
-  responseTime?: string
-  outreachPersonality?: 'Casual' | 'Professional' | 'Fun' | 'Enthusiastic' | 'Consultative' | 'Mimic Voice'
-  scrubDnc?: boolean
-  automationMode?: 'user_controlled' | 'full_auto'
-  autoSend?: boolean
-  maxGiftValue?: number
-  monthlyBurnLimit?: number
-  createdAt?: string
-  updatedAt?: string
+// Fix: Added missing AuditEntry interface for tracking system changes
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'MOVE';
+  details: string;
 }
 
-// UI-specific types
-export type OpportunityFilter = 'all' | 'open' | 'won' | 'lost'
-export type DateFilterType = 'day' | 'month' | 'year' | 'custom'
-
-// Campaign configuration (UI state)
-export interface CampaignConfig {
-  channels: string[]
-  budget: number
-  aggressiveness: number
-  products: string[]
-  objective: string
+// Fix: Added missing AIProvider enum for intelligence matrix configuration
+export enum AIProvider {
+  OPENAI = 'OpenAI',
+  ANTHROPIC = 'Anthropic',
+  GOOGLE = 'Google',
 }
 
-// AI-generated insight report
-export interface InsightReport {
-  summary: string
-  forecast: string
-  recommendations: string[]
+// Fix: Added missing TenantConfig interface for comprehensive node infrastructure
+export interface TenantConfig {
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerEmail: string;
+  ownerJobTitle: string;
+  ownerPhone: string;
+  tenantName: string;
+  companyAddress: string;
+  supabase: {
+    url: string;
+    anonKey: string;
+    serviceRole: string;
+  };
+  stripe: {
+    secretKey: string;
+    publishableKey: string;
+    webhookSecret: string;
+  };
+  twilio: {
+    accountSid: string;
+    authToken: string;
+    fromNumber: string;
+  };
+  zoom: {
+    clientId: string;
+    clientSecret: string;
+    accountId: string;
+  };
+  ai: {
+    provider: AIProvider;
+    apiKey: string;
+  };
+  mailgun: {
+    domain: string;
+    apiKey: string;
+  };
+  dns: {
+    provider: string;
+    apiKey: string;
+    domain: string;
+  };
+  gifting: {
+    postalyticsKey: string;
+    sendosoKey: string;
+  };
+}
+
+// Fix: Added missing ProductSelection interface for account packaging
+export interface ProductSelection {
+  agyantos: boolean;
+  agyantsync: boolean;
+  thorneNeural: boolean;
+}
+
+// Fix: Added missing Financials interface for settlement node configuration
+export interface Financials {
+  basePrice: number;
+  discount: number;
+  paymentStatus: 'pending' | 'sent' | 'collected';
+}
+
+// Fix: Added missing Governance interface for legal packet dispatch
+export interface Governance {
+  tos: boolean;
+  privacy: boolean;
+  mua: boolean;
+}
+
+// Fix: Added missing TenantMode enum for instance type selection
+export enum TenantMode {
+  INDIVIDUAL = 'INDIVIDUAL',
+  MULTI_TENANT = 'MULTI_TENANT',
+  EXISTING = 'EXISTING',
+}
+
+// Fix: Added missing WizardStep type for provisioning flow tracking
+export type WizardStep = number;
+
+// Fix: Added missing CustomerFormData interface for identity initialization
+export interface CustomerFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName: string;
+  jobTitle: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+}
+
+// Fix: Added missing InputProps interface for atomic UI components
+export interface InputProps {
+  label?: string;
+  placeholder?: string;
+  value: string;
+  onChange: (val: string) => void;
+  required?: boolean;
+  type?: string;
+  icon?: ReactNode;
 }

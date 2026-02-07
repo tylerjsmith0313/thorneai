@@ -1,7 +1,5 @@
 {
-  "name": "Thorne Neural Core",
-  "description": "A sophisticated income tracking and deal analysis dashboard that visualizes earned income and open opportunities with AI-driven forecasting.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
+  "name": "Agynt Feed Dashboard",
+  "description": "A responsive business diagnostics dashboard featuring modular data cards and a collapsible container for real-time conversion telemetry visualization.",
+  "requestFramePermissions": []
 }
