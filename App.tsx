@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-console.log('[v0] App.tsx reloading - components should be found');
 import LoginScreen from './LoginScreen';
 import { IncomeBreakdown } from './components/earned-income/IncomeBreakdown';
 import { OpportunitiesPipeline } from './components/opportunities-pipeline/OpportunitiesPipeline';
@@ -62,7 +61,7 @@ const App: React.FC = () => {
 
   const fetchProfile = async (id: string) => {
     const { data } = await supabase
-      .from('user_profiles')
+      .from('users')
       .select('first_name, last_name')
       .eq('id', id)
       .maybeSingle();
@@ -74,9 +73,9 @@ const App: React.FC = () => {
 
   const fetchInitialSignalCount = async (email: string) => {
     const { count } = await supabase
-      .from('system_signals')
+      .from('notifications')
       .select('*', { count: 'exact', head: true })
-      .eq('target_user_email', email);
+      .eq('is_read', false);
     setNotificationCount(count || 0);
   };
 
