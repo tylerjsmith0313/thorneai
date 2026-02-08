@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import LoginScreen from './LoginScreen';
@@ -111,69 +110,6 @@ const App: React.FC = () => {
           </div>
         </div>
       </main>
-    </div>
-  );
-};
-    );
-  }
-
-  if (!session) {
-    return <LoginScreen onLoginSuccess={() => {}} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 py-12 px-6 transition-all duration-300">
-      <div className="max-w-[1400px] mx-auto">
-        {activeView === 'main' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 px-2 gap-6">
-              <div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-2">Agynt Dashboard</h1>
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] flex items-center gap-2">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
-                  Node: {displayName || session.user.email} | Secure Uplink Active
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-3 bg-white p-2 rounded-[24px] shadow-sm border border-slate-100">
-                <NotificationsButton onClick={() => setActiveView('notifications')} count={notificationCount} />
-                <UserManagementButton onClick={() => setActiveView('user-management')} />
-                <SettingsButton onClick={() => setActiveView('settings')} />
-                <div className="h-8 w-px bg-slate-100 mx-1"></div>
-                <LogoutButton />
-              </div>
-            </header>
-
-            <AiCommandSection onOpen={() => setActiveView('ai-command')} />
-            <QuickActionsSection onAddContact={() => setIsAddContactOpen(true)} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-8 space-y-8">
-                <FeedSection onViewChange={setActiveView} />
-              </div>
-              <div className="lg:col-span-4 space-y-8">
-                <AppsSection onViewChange={setActiveView} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isAddContactOpen && <NewContactModal onClose={() => setIsAddContactOpen(false)} />}
-        {activeView === 'earned-income' && <IncomeBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'opportunities-pipeline' && <OpportunitiesPipeline onClose={() => setActiveView('main')} />}
-        {activeView === 'contacts-breakdown' && <ContactsBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'active-conversations' && <ActiveConversations onClose={() => setActiveView('main')} />}
-        {activeView === 'withering-leads' && <WitheringBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'breakups-breakdown' && <BreakUpsBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'deaddeals-analysis' && <DeadDealsBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'contact-database' && <DatabaseBreakdown onClose={() => setActiveView('main')} />}
-        {activeView === 'calendar-view' && <CalendarView onClose={() => setActiveView('main')} />}
-        {activeView === 'settings' && <SettingsView onClose={() => setActiveView('main')} />}
-        {activeView === 'user-management' && <UserManagementView onClose={() => setActiveView('main')} />}
-        {activeView === 'ai-command' && <AiCommandView onClose={() => setActiveView('main')} />}
-        {activeView === 'notifications' && <NotificationsView onClose={() => setActiveView('main')} />}
-        {activeView === 'agyantsync-app' && <AgyntSyncApp onClose={() => setActiveView('main')} />}
-      </div>
     </div>
   );
 };
