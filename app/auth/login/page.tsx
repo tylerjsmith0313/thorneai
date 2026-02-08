@@ -47,21 +47,33 @@ function LoginContent() {
     setIsLoading(true)
 
     try {
+      console.log("[v0] Login attempt:", { email: email.trim() })
       const supabase = createClient()
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      console.log("[v0] Supabase client created")
+      
+      const { error: signInError, data } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
 
+      console.log("[v0] Sign in response:", { 
+        hasError: !!signInError, 
+        errorMessage: signInError?.message,
+        hasData: !!data
+      })
+
       if (signInError) {
+        console.error("[v0] Sign in error:", signInError)
         setError(signInError.message)
         setIsLoading(false)
         return
       }
 
+      console.log("[v0] Sign in successful, redirecting")
       router.push("/")
       router.refresh()
-    } catch {
+    } catch (err) {
+      console.error("[v0] Unexpected error:", err)
       setError("A system error occurred. Please try again later.")
       setIsLoading(false)
     }
@@ -123,6 +135,7 @@ function LoginContent() {
 
     try {
       const supabase = createClient()
+      console.log("[v0] Signup attempt:", { email: signupData.email })
 
       // Extract domain from email for schema creation
       const emailDomain = signupData.email.toLowerCase().split('@')[1]
@@ -142,21 +155,36 @@ function LoginContent() {
         },
       })
 
+      console.log("[v0] Signup response:", { 
+        hasError: !!signUpError, 
+        errorMessage: signUpError?.message,
+        hasUser: !!data.user 
+      })
+
       if (signUpError) {
+        console.error("[v0] Signup error:", signUpError)
         setSignupError(signUpError.message)
         setSignupLoading(false)
         return
       }
 
       if (data.user) {
+        console.log("[v0] User created, checking organization")
         // Check if this is a new domain and create schema if needed
-        const { data: existingOrg } = await supabase
+        const { data: existingOrg, error: queryError } = await supabase
           .from('organizations')
           .select('id')
           .eq('domain', emailDomain)
           .single()
 
+        if (queryError) {
+          console.log("[v0] Query org error (expected for new domain):", queryError.message)
+        } else {
+          console.log("[v0] Organization exists")
+        }
+
         if (!existingOrg) {
+          console.log("[v0] Creating organization")
           // Create new organization for this domain
           const { error: orgError } = await supabase
             .from('organizations')
@@ -171,12 +199,14 @@ function LoginContent() {
           }
         }
 
+        console.log("[v0] Signup complete, showing success screen")
         setSignupStep("success")
       } else {
+        console.error("[v0] No user returned from signup")
         setSignupError("Failed to create account. Please try again.")
       }
     } catch (err) {
-      console.log("[v0] Signup error:", err)
+      console.error("[v0] Signup exception:", err)
       setSignupError("An unexpected error occurred. Please try again.")
     } finally {
       setSignupLoading(false)
