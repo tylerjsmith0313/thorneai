@@ -63,7 +63,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setError(null);
 
     try {
+      console.log('[v0] Auth attempt:', { mode, email });
+      
       if (mode === 'SIGNUP') {
+        console.log('[v0] Starting signup...');
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -71,26 +74,38 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             data: {
               first_name: firstName,
               last_name: lastName,
-              company: companyName, // Metadata key used by the trigger
+              company: companyName,
               job_title: jobTitle,
               phone: phone
             }
           }
         });
 
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          console.error('[v0] Signup error:', signUpError);
+          throw signUpError;
+        }
+        console.log('[v0] Signup successful');
         setMode('BILLING');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('[v0] Starting login with email:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('[v0] Login error:', error);
+          throw error;
+        }
+        
+        console.log('[v0] Login successful:', data.user?.email);
         onLoginSuccess();
       }
     } catch (err: any) {
-      setError(err.message || 'Handshake failed. Verify terminal connectivity.');
+      const errorMessage = err.message || 'Handshake failed. Verify terminal connectivity.';
+      console.error('[v0] Auth error:', errorMessage, err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -209,7 +224,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-16 pr-8 py-5 rounded-[22px] border border-slate-100 font-bold" placeholder="••••••••" required /></div>
             </div>
 
-            {error && <div className="p-4 bg-rose-50 text-rose-500 font-bold text-[10px] uppercase text-center rounded-2xl">{error}</div>}
+            {error && (
+              <div className="p-4 bg-rose-50 text-rose-500 font-bold text-[10px] uppercase text-center rounded-2xl">
+                {error.includes('Failed to fetch') 
+                  ? 'Network Error: Check your connection or try again' 
+                  : error}
+              </div>
+            )}
 
             <button type="submit" disabled={loading} className="w-full py-5 bg-[#5547eb] text-white font-black uppercase tracking-widest rounded-[22px] hover:bg-[#4338ca] transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-[0.98]">
               {loading ? 'Processing...' : (mode === 'SIGNUP' ? 'Initialize Node' : 'Login')}
