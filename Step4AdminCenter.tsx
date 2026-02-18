@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, UserRole, AuditEntry } from '../types';
 import AdminHeader from './AdminHeader';
@@ -27,6 +28,7 @@ const Step4AdminCenter: React.FC<Step4Props> = ({ users, auditLogs, onUpdateUser
   const addAuditLog = (action: AuditEntry['action'], details: string) => {
     const newEntry: AuditEntry = {
       id: Math.random().toString(36).substr(2, 9),
+      tenant_id: 'default-tenant', // Fix: Added missing tenant_id
       timestamp: new Date().toLocaleTimeString(),
       action,
       details
@@ -37,12 +39,14 @@ const Step4AdminCenter: React.FC<Step4Props> = ({ users, auditLogs, onUpdateUser
   const handleQuickAddRole = (role: UserRole) => {
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
+      tenant_id: 'default-tenant', // Fix: Added missing tenant_id
       firstName: '',
       lastName: '',
       email: '',
       phone: '',
       permissions: role,
-      parentId: users[0]?.id || undefined 
+      parentId: users[0]?.id || undefined,
+      created_at: new Date().toISOString() // Fix: Added missing created_at
     };
     onUpdateUsers([...users, newUser]);
     addAuditLog('CREATE', `Initialized blank profile with role: ${role}`);

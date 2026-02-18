@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 
 interface LoginScreenProps {
@@ -33,12 +33,6 @@ const UserIcon = () => (
   </svg>
 );
 
-const PhoneIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-  </svg>
-);
-
 const CompanyIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16h18zM8 21v-4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4M12 9v2M8 9v2M16 9v2" />
@@ -56,22 +50,40 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectStatus, setProjectStatus] = useState<'IDLE' | 'CONNECTING' | 'READY' | 'FAIL'>('IDLE');
+
+  useEffect(() => {
+    async function checkConnectivity() {
+      setProjectStatus('CONNECTING');
+      try {
+        const { data, error } = await supabase.from('tenants').select('count', { head: true });
+        if (error) throw error;
+        setProjectStatus('READY');
+      } catch (err) {
+        console.error("Connectivity Handshake Failure:", err);
+        setProjectStatus('FAIL');
+      }
+    }
+    checkConnectivity();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    const emailTrimmed = email.toLowerCase().trim();
+
     try {
       if (mode === 'SIGNUP') {
         const { error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: emailTrimmed,
           password,
           options: {
             data: {
               first_name: firstName,
               last_name: lastName,
-              company: companyName, // Metadata key used by the trigger
+              company: companyName,
               job_title: jobTitle,
               phone: phone
             }
@@ -81,15 +93,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         if (signUpError) throw signUpError;
         setMode('BILLING');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.toLowerCase().trim(),
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: emailTrimmed,
           password,
         });
 
-        if (error) throw error;
+        if (signInError) {
+           if (signInError.message.toLowerCase().includes("invalid login credentials")) {
+              throw new Error("ACCESS SIGNATURE INVALID: Verify email/password credentials or initialize a new node.");
+           }
+           throw signInError;
+        }
         onLoginSuccess();
       }
     } catch (err: any) {
+      console.error("Auth Protocol failure:", err);
       setError(err.message || 'Handshake failed. Verify terminal connectivity.');
     } finally {
       setLoading(false);
@@ -99,29 +117,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleActivateNode = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentEmail = session?.user?.email || email;
-      
-      await supabase.functions.invoke('signal-ingest', {
-        body: {
-          sender_email: currentEmail,
-          target_tenant: 'simplyflourish.space',
-          target_user_email: 'tyler@simplyflourish.space',
-          signal_type: 'NEW_NODE_ACTIVATION',
-          payload: {
-            first_name: firstName,
-            last_name: lastName,
-            job_title: jobTitle,
-            company: companyName,
-            status: 'AWAITING_SETTLEMENT'
-          }
-        }
-      });
-
       window.open('https://buy.stripe.com/test_dRmaEYfw3aincs7f5Fc3m01', '_blank');
       onLoginSuccess();
     } catch (err) {
-      console.error("Commercial activation failure:", err);
       onLoginSuccess(); 
     } finally {
       setLoading(false);
@@ -159,12 +157,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <div className="w-20 h-20 bg-[#5547eb] rounded-full flex items-center justify-center shadow-2xl mb-10 relative">
              <div className="absolute inset-0 rounded-full bg-indigo-500/10 animate-pulse scale-110"></div>
              <ShieldIcon />
+             {projectStatus === 'READY' && (
+                <div className="absolute -right-1 -top-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+             )}
           </div>
 
           <div className="text-center mb-10">
             <h2 className="text-[32px] font-[900] text-slate-900 uppercase tracking-tight leading-none mb-2">
               {mode === 'SIGNUP' ? 'Initialize Node' : 'AGYNTOS CORE'}
             </h2>
+            <div className="flex items-center justify-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${projectStatus === 'READY' ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`}></span>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                {projectStatus === 'READY' ? 'Uplink: Stable' : projectStatus === 'CONNECTING' ? 'Syncing Node...' : 'Uplink Failed'}
+              </p>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="w-full space-y-6">
@@ -209,9 +216,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-16 pr-8 py-5 rounded-[22px] border border-slate-100 font-bold" placeholder="••••••••" required /></div>
             </div>
 
-            {error && <div className="p-4 bg-rose-50 text-rose-500 font-bold text-[10px] uppercase text-center rounded-2xl">{error}</div>}
+            {error && <div className="p-5 bg-rose-50 border border-rose-100 text-rose-600 font-bold text-[10px] uppercase text-center rounded-2xl leading-relaxed animate-shake">{error}</div>}
 
-            <button type="submit" disabled={loading} className="w-full py-5 bg-[#5547eb] text-white font-black uppercase tracking-widest rounded-[22px] hover:bg-[#4338ca] transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-[0.98]">
+            <button type="submit" disabled={loading || projectStatus === 'FAIL'} className="w-full py-5 bg-[#5547eb] text-white font-black uppercase tracking-widest rounded-[22px] hover:bg-[#4338ca] transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-[0.98] disabled:opacity-50">
               {loading ? 'Processing...' : (mode === 'SIGNUP' ? 'Initialize Node' : 'Login')}
             </button>
           </form>

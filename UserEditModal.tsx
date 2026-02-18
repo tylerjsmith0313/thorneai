@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole } from './types';
 import { CloseIcon, TrashIcon } from './Icons';
+import { HumanIdentityFields } from './components/shared/HumanIdentityFields';
 
 interface UserEditModalProps {
   user: User;
@@ -20,6 +21,17 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ user, onSave, onClose, on
     onSave(formData);
   };
 
+  const handleIdentityChange = (field: string, value: string) => {
+    // Map field names if they differ from the User type
+    const map: Record<string, keyof User> = {
+      'first_name': 'firstName',
+      'last_name': 'lastName',
+      'email': 'email',
+      'phone': 'phone'
+    };
+    setFormData(prev => ({ ...prev, [map[field]]: value }));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#020617]/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col animate-in zoom-in-95 duration-300">
@@ -30,54 +42,30 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ user, onSave, onClose, on
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">First Name</label>
-              <input 
-                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-100 outline-none font-bold text-slate-900 transition-all"
-                value={formData.firstName}
-                onChange={e => setFormData({...formData, firstName: e.target.value})}
-              />
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 flex-1 overflow-y-auto">
+          <HumanIdentityFields 
+            firstName={formData.firstName}
+            lastName={formData.lastName}
+            email={formData.email}
+            phone={formData.phone}
+            onChange={handleIdentityChange}
+            variant="light"
+          />
+
+          <div>
+            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest ml-3 mb-2">Access Role</label>
+            <div className="relative">
+              <select 
+                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:bg-white focus:border-indigo-100 transition-all appearance-none cursor-pointer"
+                value={formData.permissions}
+                onChange={e => setFormData({...formData, permissions: e.target.value as UserRole})}
+              >
+                {roles.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path d="M19 9l-7 7-7-7" /></svg>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Last Name</label>
-              <input 
-                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-100 outline-none font-bold text-slate-900 transition-all"
-                value={formData.lastName}
-                onChange={e => setFormData({...formData, lastName: e.target.value})}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
-            <input 
-              className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-100 outline-none font-bold text-slate-900 transition-all"
-              type="email"
-              value={formData.email}
-              onChange={e => setFormData({...formData, email: e.target.value})}
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Phone</label>
-            <input 
-              className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-100 outline-none font-bold text-slate-900 transition-all"
-              value={formData.phone}
-              onChange={e => setFormData({...formData, phone: e.target.value})}
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Access Role</label>
-            <select 
-              className="w-full px-5 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-100 outline-none font-bold text-slate-900 transition-all appearance-none cursor-pointer"
-              value={formData.permissions}
-              onChange={e => setFormData({...formData, permissions: e.target.value as UserRole})}
-            >
-              {roles.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
           </div>
         </form>
 
