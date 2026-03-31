@@ -29,7 +29,6 @@
 
 // Core Neural Network
 export {
-  thorneNeuralNetwork,
   getDashboardMetrics,
   getContactAnalytics,
   getRevenueAnalytics,
@@ -37,14 +36,18 @@ export {
   structureDataForAI,
   generateReport,
   aggregatePerformanceData,
-  type AnalyticsTimeframe,
-  type MetricDataPoint,
-  type DashboardMetrics,
-  type ContactAnalytics,
-  type RevenueAnalytics,
-  type ConversationAnalytics,
-  type AIReadyData,
 } from './neural-network'
+
+// Types (exported from separate file to avoid "use server" conflicts)
+export type {
+  AnalyticsTimeframe,
+  MetricDataPoint,
+  DashboardMetrics,
+  ContactAnalytics,
+  RevenueAnalytics,
+  ConversationAnalytics,
+  AIReadyData,
+} from './types'
 
 // Data Collection
 export {
@@ -58,6 +61,7 @@ export {
   calculateHeatScores,
   exportContactsCSV,
   exportReportData,
-  type DataEvent,
-  type DataIngestionResult,
 } from './data-collector'
+
+// Re-export data collector types from types file
+export type { DataEvent, DataIngestionResult } from './types'

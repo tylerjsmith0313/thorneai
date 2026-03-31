@@ -26,10 +26,19 @@ import {
   Globe,
   Mail,
   Instagram,
+  Move,
+  Code,
+  ClipboardCopy,
+  Check,
+  MessageSquare,
+  MousePointer2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { FormBuilder, type FormConfig } from "./form-builder"
+import { ChatWidgetBuilder, type ChatWidgetConfig } from "./chat-widget-builder"
+import { ChatButtonBuilder, type ChatButtonConfig } from "./chat-button-builder"
 
-type ProjectType = "form" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
+type ProjectType = "form" | "chat_widget" | "chat_button" | "landing_page" | "website" | "email_template" | "social_story" | "social_post"
 
 interface CanvasElement {
   id: string
@@ -56,7 +65,8 @@ interface CreativeStudioModalProps {
 }
 
 const PROJECT_TYPES: { id: ProjectType; label: string; icon: React.ElementType; description: string }[] = [
-  { id: "form", label: "Form", icon: ImageIcon, description: "Lead capture forms" },
+  { id: "form", label: "Form", icon: FileText, description: "Lead capture forms" },
+  { id: "chat_widget", label: "Chat Widget", icon: MessageSquare, description: "Embeddable live chat" },
   { id: "landing_page", label: "Landing Page", icon: Layout, description: "Conversion pages" },
   { id: "website", label: "Website", icon: Globe, description: "Multi-page sites" },
   { id: "email_template", label: "Email Template", icon: Mail, description: "Email campaigns" },
@@ -68,6 +78,7 @@ const CANVAS_SIZES: Record<ProjectType, { width: number; height: number }> = {
   social_story: { width: 1080, height: 1920 },
   social_post: { width: 1080, height: 1080 },
   form: { width: 600, height: 800 },
+  chat_widget: { width: 400, height: 600 },
   landing_page: { width: 1200, height: 900 },
   website: { width: 1440, height: 900 },
   email_template: { width: 600, height: 800 },
@@ -89,8 +100,16 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
   const [historyIndex, setHistoryIndex] = useState(0)
   const [saving, setSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState<string>("responsive")
+  const [formConfig, setFormConfig] = useState<FormConfig | null>(editingAsset?.canvas_data as FormConfig | null)
+  const [chatWidgetConfig, setChatWidgetConfig] = useState<ChatWidgetConfig | null>(editingAsset?.canvas_data as ChatWidgetConfig | null)
+  const [showEmbedCode, setShowEmbedCode] = useState(false)
+  const [embedCopied, setEmbedCopied] = useState(false)
+  const [savedAssetId, setSavedAssetId] = useState<string | null>(editingAsset?.id || null)
 
   const isCanvasEditor = projectType === "social_story" || projectType === "social_post"
+  const isFormBuilder = projectType === "form"
+  const isChatWidgetBuilder = projectType === "chat_widget"
+  const isEmbeddable = isFormBuilder || isChatWidgetBuilder
   const canvasSize = CANVAS_SIZES[projectType]
 
   // Save to history for undo/redo
@@ -219,30 +238,112 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
   const handleSave = async () => {
     setSaving(true)
     try {
+      // For chat widgets, we need to save to widget_chatbots table
+      if (isChatWidgetBuilder && chatWidgetConfig) {
+        const chatbotData = {
+          name: chatWidgetConfig.name || projectName,
+          welcome_message: chatWidgetConfig.welcomeMessage,
+          ai_instructions: chatWidgetConfig.aiInstructions || null,
+          theme_color: chatWidgetConfig.themeColor,
+        }
+
+        if (savedAssetId) {
+          const { data } = await supabase
+            .from("widget_chatbots")
+            .update(chatbotData)
+            .eq("id", savedAssetId)
+            .select()
+            .single()
+          if (data) setSavedAssetId(data.id)
+        } else {
+          const res = await fetch("/api/widget/chatbots", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: chatbotData.name,
+              welcomeMessage: chatbotData.welcome_message,
+              aiInstructions: chatbotData.ai_instructions,
+              themeColor: chatbotData.theme_color,
+            }),
+          })
+          const data = await res.json()
+          if (data.chatbot) {
+            setSavedAssetId(data.chatbot.id)
+          }
+        }
+        // Show embed code after save
+        setShowEmbedCode(true)
+        return
+      }
+
+      // For forms and other assets
       const assetData = {
         name: projectName,
         type: projectType,
-        content_type: isCanvasEditor ? "json" as const : "html" as const,
-        canvas_data: isCanvasEditor ? elements : null,
-        content: isCanvasEditor ? null : generateHTML(),
-        metadata: { canvasSize, previewMode },
+        content_type: (isCanvasEditor || isFormBuilder) ? "json" as const : "html" as const,
+        canvas_data: isCanvasEditor ? elements : isFormBuilder ? formConfig : null,
+        content: (isCanvasEditor || isFormBuilder) ? null : generateHTML(),
+        metadata: { canvasSize, previewMode, formConfig: isFormBuilder ? formConfig : undefined },
       }
 
-      if (editingAsset?.id) {
-        await supabase
+      if (editingAsset?.id || savedAssetId) {
+        const { data } = await supabase
           .from("creative_assets")
           .update(assetData)
-          .eq("id", editingAsset.id)
+          .eq("id", editingAsset?.id || savedAssetId)
+          .select()
+          .single()
+        if (data) setSavedAssetId(data.id)
       } else {
-        await supabase
+        const { data } = await supabase
           .from("creative_assets")
           .insert(assetData)
+          .select()
+          .single()
+        if (data) setSavedAssetId(data.id)
+      }
+      
+      // Show embed code for embeddable assets
+      if (isEmbeddable) {
+        setShowEmbedCode(true)
       }
     } catch (error) {
       console.error("[v0] Failed to save:", error)
     } finally {
       setSaving(false)
     }
+  }
+
+  // Generate embed code for forms and chat widgets
+  const getEmbedCode = () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const assetId = savedAssetId || editingAsset?.id || 'YOUR_ID'
+    
+    if (isChatWidgetBuilder) {
+      return `<!-- Flourish Agency Chat Widget -->
+<script src="${baseUrl}/api/widget/embed.js?id=${assetId}" async></script>`
+    }
+    
+    // Form embed code
+    return `<!-- Flourish Agency Embed Form -->
+<div id="flourish-form-${assetId}"></div>
+<script>
+(function() {
+  var iframe = document.createElement('iframe');
+  iframe.src = '${baseUrl}/embed/form/${assetId}';
+  iframe.style.width = '100%';
+  iframe.style.height = '600px';
+  iframe.style.border = 'none';
+  iframe.style.borderRadius = '12px';
+  document.getElementById('flourish-form-${assetId}').appendChild(iframe);
+})();
+</script>`
+  }
+
+  const copyEmbedCode = () => {
+    navigator.clipboard.writeText(getEmbedCode())
+    setEmbedCopied(true)
+    setTimeout(() => setEmbedCopied(false), 2000)
   }
 
   // Generate HTML for non-canvas projects
@@ -315,6 +416,17 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
               <Button variant="outline" size="sm" className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent">
                 <Download size={14} className="mr-2" />
                 Export
+              </Button>
+            )}
+            {isEmbeddable && savedAssetId && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowEmbedCode(!showEmbedCode)}
+                className="rounded-xl font-black uppercase tracking-widest text-[10px] bg-transparent"
+              >
+                <Code size={14} className="mr-2" />
+                Get Embed Code
               </Button>
             )}
             <div className="w-px h-8 bg-slate-100 mx-2" />
@@ -397,9 +509,67 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
           )}
         </div>
 
+        {/* Embed Code Modal */}
+        {showEmbedCode && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h4 className="text-lg font-black text-slate-900">
+                    {isChatWidgetBuilder ? "Embed Your Chat Widget" : "Embed Your Form"}
+                  </h4>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {isChatWidgetBuilder 
+                      ? "Add this code before </body> to enable live chat on your website"
+                      : "Copy this code and paste it into your website"
+                    }
+                  </p>
+                </div>
+                <button onClick={() => setShowEmbedCode(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="bg-slate-900 rounded-2xl p-6 overflow-auto max-h-64">
+                  <pre className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-all">
+                    {getEmbedCode()}
+                  </pre>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button onClick={copyEmbedCode} className="flex-1 rounded-xl font-black uppercase tracking-widest text-[10px]">
+                    {embedCopied ? (
+                      <>
+                        <Check size={14} className="mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardCopy size={14} className="mr-2" />
+                        Copy Embed Code
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowEmbedCode(false)} className="rounded-xl font-black uppercase tracking-widest text-[10px]">
+                    Close
+                  </Button>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-xs text-amber-700">
+                    <strong>Note:</strong> {isChatWidgetBuilder 
+                      ? "The chat widget will appear in the bottom corner of your website. Conversations and leads are automatically captured in your dashboard."
+                      : "Make sure to save your form first before embedding. The form will automatically capture submissions and store them in your dashboard."
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Workspace */}
         <div className="flex-1 overflow-hidden flex bg-slate-50/40">
-          {/* Tool Sidebar */}
+          {/* Tool Sidebar - Hide for Form Builder and Chat Widget since they have their own UI */}
+          {!isFormBuilder && !isChatWidgetBuilder && (
           <aside className="w-80 bg-white border-r border-slate-100 p-8 flex flex-col gap-10 overflow-y-auto relative z-10">
             <section className="space-y-4">
               <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
@@ -581,12 +751,31 @@ export function CreativeStudioModal({ onClose, initialType = "landing_page", edi
               </div>
             </div>
           </aside>
+          )}
 
           {/* Canvas Container */}
           <main className="flex-1 relative flex flex-col items-center justify-center p-12 overflow-hidden">
             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
-            {isCanvasEditor ? (
+            {isFormBuilder ? (
+              /* Form Builder */
+              <div className="w-full h-full overflow-auto">
+                <FormBuilder 
+                  formId={savedAssetId || undefined}
+                  initialConfig={formConfig || undefined}
+                  onConfigChange={setFormConfig}
+                />
+              </div>
+            ) : isChatWidgetBuilder ? (
+              /* Chat Widget Builder */
+              <div className="w-full h-full overflow-auto">
+                <ChatWidgetBuilder
+                  widgetId={savedAssetId || undefined}
+                  initialConfig={chatWidgetConfig || undefined}
+                  onConfigChange={setChatWidgetConfig}
+                />
+              </div>
+            ) : isCanvasEditor ? (
               /* Canvas Editor for Social Story / Social Post */
               <div 
                 ref={canvasRef}

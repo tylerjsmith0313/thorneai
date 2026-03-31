@@ -4,24 +4,27 @@ import { useState, useEffect } from "react"
 import { 
   MessageSquare, Search, Filter, User, Zap, Sparkles, Send, 
   Paperclip, Mail, MessageCircle, Linkedin, Phone, X,
-  ChevronDown, Clock, Activity, Flame, FileText, Calendar, Gift
+  ChevronDown, Clock, Activity, Flame, FileText, Calendar, Gift, Loader2
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { createClient } from "@/lib/supabase/client"
 import type { Contact } from "@/types"
 
-type ChannelType = "email" | "sms" | "linkedin" | "whatsapp" | "phone"
+type ChannelType = "email" | "sms" | "linkedin" | "whatsapp" | "phone" | "chat"
 type FilterType = "all" | "flow-active" | "flow-deactivated" | "awaiting-reply"
 
 interface Thread {
   id: string
-  contact: Contact
+  contact: Contact | null
   channel: ChannelType
   lastMessage: string
   timestamp: string
   unread: number
   flowActive: boolean
   awaitingReply: boolean
+  sessionId?: string
+  visitorName?: string
+  visitorEmail?: string
 }
 
 interface Message {
@@ -38,6 +41,7 @@ const CHANNEL_ICONS: Record<ChannelType, typeof Mail> = {
   linkedin: Linkedin,
   whatsapp: MessageCircle,
   phone: Phone,
+  chat: MessageSquare,
 }
 
 const CHANNEL_COLORS: Record<ChannelType, string> = {
@@ -46,6 +50,7 @@ const CHANNEL_COLORS: Record<ChannelType, string> = {
   linkedin: "text-blue-600",
   whatsapp: "text-green-500",
   phone: "text-amber-500",
+  chat: "text-violet-500",
 }
 
 const QUICK_REPLIES = [
@@ -75,31 +80,145 @@ export function ConversationEngine() {
   const [sentiment, setSentiment] = useState("Neutral")
   const [heat, setHeat] = useState(88)
 
-  // Load threads from contacts
+  // Load threads from multiple sources: widget chats, emails, and conversations
   useEffect(() => {
     async function loadThreads() {
-      const { data: contacts } = await supabase
-        .from("contacts")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(20)
+      const allThreads: Thread[] = []
 
-      if (contacts) {
-        const mockThreads: Thread[] = contacts.map((contact, i) => ({
-          id: contact.id,
-          contact: contact as Contact,
-          channel: (["email", "sms", "linkedin", "whatsapp"][i % 4]) as ChannelType,
-          lastMessage: `"${contact.first_name ? `Looking forward to the pr...` : "Great, thanks for the upda..."}"`,
-          timestamp: "2m ago",
-          unread: i < 2 ? i + 1 : 0,
-          flowActive: i % 3 !== 2,
-          awaitingReply: i % 4 === 0,
-        }))
-        setThreads(mockThreads)
+      // 1. Fetch widget chat sessions
+      const { data: sessions, error: sessionsError } = await supabase
+        .from("widget_sessions")
+        .select(`
+          *,
+          contacts (id, first_name, last_name, email, company, phone, status),
+          widget_messages (id, content, role, created_at)
+        `)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(30)
+
+      if (!sessionsError && sessions) {
+        const chatThreads: Thread[] = sessions.map((session) => {
+          const lastMsg = session.widget_messages?.sort((a: any, b: any) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0]
+          
+          const timeAgo = session.last_message_at 
+            ? formatTimeAgo(new Date(session.last_message_at))
+            : "No messages"
+
+          return {
+            id: session.id,
+            sessionId: session.id,
+            contact: session.contacts as Contact | null,
+            channel: "chat" as ChannelType,
+            lastMessage: lastMsg?.content?.substring(0, 50) + (lastMsg?.content?.length > 50 ? "..." : "") || "No messages yet",
+            timestamp: timeAgo,
+            unread: session.status === "active" ? 1 : 0,
+            flowActive: session.status === "active",
+            awaitingReply: lastMsg?.role === "user",
+            visitorName: session.visitor_name,
+            visitorEmail: session.visitor_email,
+          }
+        })
+        allThreads.push(...chatThreads)
       }
+
+      // 2. Fetch email threads grouped by contact
+      const { data: emails, error: emailsError } = await supabase
+        .from("email_messages")
+        .select(`
+          *,
+          contacts (id, first_name, last_name, email, company, phone, status)
+        `)
+        .order("received_at", { ascending: false })
+        .limit(50)
+
+      if (!emailsError && emails) {
+        // Group emails by contact_id to create threads
+        const emailsByContact = new Map<string, typeof emails>()
+        emails.forEach((email) => {
+          const key = email.contact_id || email.from_email
+          if (!emailsByContact.has(key)) {
+            emailsByContact.set(key, [])
+          }
+          emailsByContact.get(key)!.push(email)
+        })
+
+        emailsByContact.forEach((contactEmails, key) => {
+          const lastEmail = contactEmails[0]
+          const contact = lastEmail.contacts as Contact | null
+          
+          allThreads.push({
+            id: `email-${key}`,
+            sessionId: undefined,
+            contact: contact,
+            channel: "email" as ChannelType,
+            lastMessage: lastEmail.subject || lastEmail.stripped_text?.substring(0, 50) || "No subject",
+            timestamp: lastEmail.received_at ? formatTimeAgo(new Date(lastEmail.received_at)) : "Unknown",
+            unread: contactEmails.filter(e => e.direction === "inbound" && e.status === "received").length,
+            flowActive: false,
+            awaitingReply: lastEmail.direction === "inbound",
+            visitorName: lastEmail.from_name || undefined,
+            visitorEmail: lastEmail.from_email,
+          })
+        })
+      }
+
+      // 3. Fetch conversations (SMS, LinkedIn, etc.)
+      const { data: conversations, error: convoError } = await supabase
+        .from("conversations")
+        .select(`
+          *,
+          contacts (id, first_name, last_name, email, company, phone, status)
+        `)
+        .order("last_active", { ascending: false })
+        .limit(30)
+
+      if (!convoError && conversations) {
+        const convoThreads: Thread[] = conversations.map((convo) => ({
+          id: convo.id,
+          sessionId: undefined,
+          contact: convo.contacts as Contact | null,
+          channel: convo.channel.toLowerCase() as ChannelType,
+          lastMessage: convo.last_message || "No messages",
+          timestamp: convo.last_active ? formatTimeAgo(new Date(convo.last_active)) : "Unknown",
+          unread: convo.unread_count || 0,
+          flowActive: convo.status === "thorne_handling",
+          awaitingReply: convo.status === "awaiting_reply",
+        }))
+        allThreads.push(...convoThreads)
+      }
+
+      // Sort all threads by most recent activity
+      allThreads.sort((a, b) => {
+        const getTime = (ts: string) => {
+          if (ts.includes("Just now")) return Date.now()
+          if (ts.includes("m ago")) return Date.now() - parseInt(ts) * 60000
+          if (ts.includes("h ago")) return Date.now() - parseInt(ts) * 3600000
+          if (ts.includes("d ago")) return Date.now() - parseInt(ts) * 86400000
+          return 0
+        }
+        return getTime(b.timestamp) - getTime(a.timestamp)
+      })
+
+      setThreads(allThreads)
     }
     loadThreads()
   }, [])
+
+  // Helper to format time ago
+  function formatTimeAgo(date: Date): string {
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return "Just now"
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    return `${diffDays}d ago`
+  }
 
   // Filter threads
   const filteredThreads = threads.filter(thread => {
@@ -107,42 +226,182 @@ export function ConversationEngine() {
     if (filter === "flow-deactivated" && thread.flowActive) return false
     if (filter === "awaiting-reply" && !thread.awaitingReply) return false
     if (searchQuery) {
-      const name = `${thread.contact.first_name} ${thread.contact.last_name}`.toLowerCase()
+      const name = thread.contact 
+        ? `${thread.contact.first_name} ${thread.contact.last_name}`.toLowerCase()
+        : (thread.visitorName || "").toLowerCase()
       if (!name.includes(searchQuery.toLowerCase())) return false
     }
     return true
   })
 
+  // Helper to get display name for thread
+  const getThreadName = (thread: Thread) => {
+    if (thread.contact) {
+      return `${thread.contact.first_name || ""} ${thread.contact.last_name || ""}`.trim() || "Unknown"
+    }
+    return thread.visitorName || thread.visitorEmail || "Visitor"
+  }
+
   // Load messages when thread selected
   useEffect(() => {
-    if (selectedThread) {
+    async function loadMessages() {
+      if (!selectedThread) return
+      
+      const threadName = getThreadName(selectedThread)
+      let formattedMessages: Message[] = []
+
+      // Load messages based on channel type
+      if (selectedThread.channel === "chat" && selectedThread.sessionId) {
+        // Load widget chat messages
+        const { data: msgs, error } = await supabase
+          .from("widget_messages")
+          .select("*")
+          .eq("session_id", selectedThread.sessionId)
+          .order("created_at", { ascending: true })
+
+        if (!error && msgs) {
+          formattedMessages = msgs.map((msg) => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.sender_type === "agent" || msg.sender_type === "ai" ? "user" : msg.sender_type === "visitor" ? "contact" : "system",
+            timestamp: formatTimeAgo(new Date(msg.created_at)),
+          }))
+        }
+      } else if (selectedThread.channel === "email") {
+        // Load email messages for this contact
+        const contactId = selectedThread.contact?.id
+        const contactEmail = selectedThread.visitorEmail || selectedThread.contact?.email
+        
+        let query = supabase
+          .from("email_messages")
+          .select("*")
+          .order("received_at", { ascending: true })
+        
+        if (contactId) {
+          query = query.eq("contact_id", contactId)
+        } else if (contactEmail) {
+          query = query.or(`from_email.eq.${contactEmail},to_email.eq.${contactEmail}`)
+        }
+
+        const { data: emails, error } = await query.limit(50)
+
+        if (!error && emails) {
+          formattedMessages = emails.map((email) => ({
+            id: email.id,
+            content: `**${email.subject || "(No subject)"}**\n\n${email.stripped_text || email.body_plain || ""}`,
+            sender: email.direction === "outbound" ? "user" : "contact",
+            timestamp: formatTimeAgo(new Date(email.received_at || email.created_at)),
+          }))
+        }
+      } else {
+        // Load from messages table for other channels
+        const { data: msgs, error } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", selectedThread.id)
+          .order("created_at", { ascending: true })
+
+        if (!error && msgs) {
+          formattedMessages = msgs.map((msg) => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.sender_type as "user" | "contact" | "system",
+            timestamp: formatTimeAgo(new Date(msg.created_at)),
+          }))
+        }
+      }
+
+      // Add system message at the start
       setMessages([
         {
-          id: "1",
-          content: `Connection established with ${selectedThread.contact.first_name} ${selectedThread.contact.last_name}. I am monitoring this node for engagement signals.`,
+          id: "system-start",
+          content: `${selectedThread.channel.toUpperCase()} conversation with ${threadName}. ${selectedThread.visitorEmail ? `Email: ${selectedThread.visitorEmail}` : ""}`,
           sender: "system",
           timestamp: "System"
-        }
+        },
+        ...formattedMessages
       ])
-      setAiInsight(`The message provided is empty, making it impossible to determine sentiment or provide tactical sales advice.`)
+
+      // Set AI insight based on conversation
+      if (formattedMessages.length > 0) {
+        const lastContactMsg = formattedMessages.filter((m) => m.sender === "contact").pop()
+        if (lastContactMsg) {
+          setAiInsight(`Latest from contact: "${lastContactMsg.content.substring(0, 100)}..." - Analyze and suggest response.`)
+        }
+      } else {
+        setAiInsight("No messages yet. Start the conversation or wait for contact to reach out.")
+      }
+    }
+    
+    if (selectedThread) {
+      loadMessages()
     }
   }, [selectedThread])
 
-  const sendMessage = () => {
-    if (!draftMessage.trim() || !selectedThread) return
+  const [emailSubject, setEmailSubject] = useState("")
+  const [isSending, setIsSending] = useState(false)
+
+  const sendMessage = async () => {
+    if (!draftMessage.trim() || !selectedThread || isSending) return
     
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: draftMessage,
-      sender: "user",
-      timestamp: "Just now"
+    setIsSending(true)
+    const toEmail = selectedThread.contact?.email || selectedThread.visitorEmail
+
+    try {
+      if (selectedThread.channel === "email" && toEmail) {
+        // Send email via Mailgun API
+        const response = await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: toEmail,
+            toName: getThreadName(selectedThread),
+            subject: emailSubject || `Re: ${selectedThread.lastMessage}`,
+            text: draftMessage,
+            contactId: selectedThread.contact?.id,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to send email")
+        }
+      } else if (selectedThread.channel === "chat" && selectedThread.sessionId) {
+        // Send chat message via widget
+        await supabase.from("widget_messages").insert({
+          session_id: selectedThread.sessionId,
+          chatbot_id: (await supabase.from("widget_sessions").select("chatbot_id").eq("id", selectedThread.sessionId).single()).data?.chatbot_id,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          content: draftMessage,
+          sender_type: "agent",
+        })
+      }
+
+      // Add message to local state
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content: selectedThread.channel === "email" ? `**${emailSubject || "Re: " + selectedThread.lastMessage}**\n\n${draftMessage}` : draftMessage,
+        sender: "user",
+        timestamp: "Just now"
+      }
+      setMessages([...messages, newMessage])
+      setDraftMessage("")
+      setEmailSubject("")
+    } catch (error) {
+      console.error("[v0] Error sending message:", error)
+    } finally {
+      setIsSending(false)
     }
-    setMessages([...messages, newMessage])
-    setDraftMessage("")
   }
 
-  const getInitials = (contact: Contact) => {
-    return `${contact.first_name?.[0] || ""}${contact.last_name?.[0] || ""}`.toUpperCase()
+  const getInitials = (thread: Thread) => {
+    if (thread.contact) {
+      return `${thread.contact.first_name?.[0] || ""}${thread.contact.last_name?.[0] || ""}`.toUpperCase() || "?"
+    }
+    if (thread.visitorName) {
+      const parts = thread.visitorName.split(" ")
+      return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase() || "?"
+    }
+    return "V"
   }
 
   return (
@@ -223,7 +482,7 @@ export function ConversationEngine() {
                     <div className="relative">
                       <Avatar className="w-10 h-10 border-2 border-white shadow-sm">
                         <AvatarFallback className="bg-indigo-100 text-indigo-600 text-xs font-bold">
-                          {getInitials(thread.contact)}
+                          {getInitials(thread)}
                         </AvatarFallback>
                       </Avatar>
                       {thread.unread > 0 && (
@@ -240,11 +499,11 @@ export function ConversationEngine() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-slate-900">
-                          {thread.contact.first_name} {thread.contact.last_name}
+                          {getThreadName(thread)}
                         </span>
                         <ChannelIcon size={12} className={CHANNEL_COLORS[thread.channel]} />
                       </div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">{thread.channel}</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">{thread.channel} {thread.timestamp}</p>
                       <p className="text-xs text-slate-500 truncate mt-1">{thread.lastMessage}</p>
                     </div>
                   </div>
@@ -262,8 +521,14 @@ export function ConversationEngine() {
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar className="w-10 h-10 bg-indigo-600 text-white">
-                    <AvatarFallback>{getInitials(selectedThread.contact)}</AvatarFallback>
+                    <AvatarFallback>{getInitials(selectedThread)}</AvatarFallback>
                   </Avatar>
+                  <div>
+                    <p className="font-bold text-slate-900">{getThreadName(selectedThread)}</p>
+                    {selectedThread.visitorEmail && (
+                      <p className="text-xs text-slate-500">{selectedThread.visitorEmail}</p>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <button className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium flex items-center gap-1.5">
                       <User size={12} />
@@ -333,11 +598,23 @@ export function ConversationEngine() {
                   <Sparkles size={12} className="text-indigo-500" />
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Neural Draft Interface</span>
                 </div>
+                {selectedThread.channel === "email" && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Subject:</span>
+                    <input
+                      type="text"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      placeholder="Email subject..."
+                      className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+                    />
+                  </div>
+                )}
                 <div className="bg-slate-50 rounded-2xl p-4">
                   <textarea
                     value={draftMessage}
                     onChange={(e) => setDraftMessage(e.target.value)}
-                    placeholder={`Draft a reply to ${selectedThread.contact.first_name}...`}
+                    placeholder={`Draft a reply to ${getThreadName(selectedThread)}...`}
                     className="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]"
                   />
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-200">
@@ -349,12 +626,13 @@ export function ConversationEngine() {
                         <Sparkles size={14} />
                         Thorne Draft
                       </button>
-                      <button 
+                      <button
                         onClick={sendMessage}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-indigo-500"
+                        disabled={isSending}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Send size={14} />
-                        Send Node
+                        {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        {isSending ? "Sending..." : "Send"}
                       </button>
                     </div>
                   </div>
@@ -387,7 +665,7 @@ export function ConversationEngine() {
                   >
                     <span className="text-[9px] font-bold uppercase tracking-wider">{reply.label}</span>
                     <p className="text-xs mt-1 opacity-80">
-                      "Hi {selectedThread.contact.first_name}, I've been following {selectedThread.contact.company || "your company"}'s recent progress and I'm..."
+                      "Hi {getThreadName(selectedThread).split(" ")[0]}, I've been following {selectedThread.contact?.company || "your company"}'s recent progress and I'm..."
                     </p>
                   </button>
                 ))}

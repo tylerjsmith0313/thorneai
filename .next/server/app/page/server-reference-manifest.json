@@ -1,0 +1,80 @@
+{
+  "node": {
+    "402ad0ffd7504c6324053c8406d9dff08ea6ee0047": {
+      "workers": {
+        "app/page": {
+          "moduleId": 94618,
+          "async": false,
+          "exportedName": "createContactAction",
+          "filename": "app/actions.ts"
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      },
+      "exportedName": "createContactAction",
+      "filename": "app/actions.ts"
+    },
+    "40178660e7031c46880baa1f0774f92ec9e5cf0126": {
+      "workers": {
+        "app/page": {
+          "moduleId": 94618,
+          "async": false,
+          "exportedName": "searchLeads",
+          "filename": "lib/services/lead-enrichment.ts"
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      },
+      "exportedName": "searchLeads",
+      "filename": "lib/services/lead-enrichment.ts"
+    },
+    "4010499b26f9f679dff5449a222215779dca43c92e": {
+      "workers": {
+        "app/page": {
+          "moduleId": 94618,
+          "async": false,
+          "exportedName": "verifyLead",
+          "filename": "lib/services/lead-enrichment.ts"
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      },
+      "exportedName": "verifyLead",
+      "filename": "lib/services/lead-enrichment.ts"
+    },
+    "4073f6ae5c7401b43b5d178366230838aa1913bc22": {
+      "workers": {
+        "app/page": {
+          "moduleId": 94618,
+          "async": false,
+          "exportedName": "saveLeadAsContact",
+          "filename": "lib/services/lead-enrichment.ts"
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      },
+      "exportedName": "saveLeadAsContact",
+      "filename": "lib/services/lead-enrichment.ts"
+    },
+    "400ab61c6423ea3d5a160fc52098d56d978329a838": {
+      "workers": {
+        "app/page": {
+          "moduleId": 94618,
+          "async": false,
+          "exportedName": "bulkImportContactsAction",
+          "filename": "app/actions.ts"
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      },
+      "exportedName": "bulkImportContactsAction",
+      "filename": "app/actions.ts"
+    }
+  },
+  "edge": {}
+}

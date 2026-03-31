@@ -1,0 +1,20 @@
+{
+  "node": {
+    "603bf032a109c14539a49fef96f434a85e2bc4e34e": {
+      "workers": {
+        "app/admin/settings/page": {
+          "moduleId": 91888,
+          "async": false,
+          "exportedName": "createBillingPortalSession",
+          "filename": "app/actions/stripe.ts"
+        }
+      },
+      "layer": {
+        "app/admin/settings/page": "action-browser"
+      },
+      "exportedName": "createBillingPortalSession",
+      "filename": "app/actions/stripe.ts"
+    }
+  },
+  "edge": {}
+}

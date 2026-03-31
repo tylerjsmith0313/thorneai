@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Settings, User, Cog, Package, Brain, GitBranch, Shield, X, Plug } from "lucide-react"
+import { Settings, User, Cog, Package, Brain, GitBranch, Shield, X, Plug, MessageSquare } from "lucide-react"
 import { UserSettings } from "./control-center/user-settings"
 import { AutomationSettings } from "./control-center/automation-settings"
 import { ProductsSettings } from "./control-center/products-settings"
@@ -9,6 +9,7 @@ import { KnowledgeSettings } from "./control-center/knowledge-settings"
 import { WorkflowSettings } from "./control-center/workflow-settings"
 import { SafeguardsSettings } from "./control-center/safeguards-settings"
 import { IntegrationsSettings } from "./control-center/integrations-settings"
+import { WidgetSettings } from "./control-center/widget-settings"
 
 const navItems = [
   { id: "user", label: "User Settings", icon: User },
@@ -17,6 +18,7 @@ const navItems = [
   { id: "knowledge", label: "Knowledge", icon: Brain },
   { id: "workflow", label: "Workflow", icon: GitBranch },
   { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "widget", label: "Chat Widget", icon: MessageSquare },
   { id: "safeguards", label: "Safeguards", icon: Shield },
 ]
 
@@ -73,6 +75,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
           {activeSection === "knowledge" && <KnowledgeSettings />}
           {activeSection === "workflow" && <WorkflowSettings />}
           {activeSection === "integrations" && <IntegrationsSettings />}
+          {activeSection === "widget" && <WidgetSettings />}
           {activeSection === "safeguards" && <SafeguardsSettings />}
         </div>
       </div>

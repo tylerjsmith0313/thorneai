@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useState, useEffect } from "react"
-import { Target, Plus, FileText, Calendar, Trash2, Pencil, Loader2, DollarSign, TrendingUp, Flame, Snowflake, Thermometer } from "lucide-react"
+import { Target, Plus, FileText, Calendar, Trash2, Pencil, Loader2, DollarSign, TrendingUp, Flame, Snowflake, Thermometer, X, Check, Percent, Package } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { MeetingScheduler } from "../common/meeting-scheduler"
 import { ProposalWizard } from "@/components/modals/proposal-wizard/proposal-wizard"
@@ -15,6 +15,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { createClient } from "@/lib/supabase/client"
+
+interface Product {
+  id: string
+  name: string
+  retail_price: number
+  billing_interval: string
+  classification: string
+}
 
 interface OpportunitiesSectionProps {
   contact: Contact
@@ -46,6 +56,7 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
   const [isProposalWizardOpen, setIsProposalWizardOpen] = useState(false)
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
 
+  const [products, setProducts] = useState<Product[]>([])
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -55,6 +66,10 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
     expectedCloseDate: "",
     notes: "",
     heatStatus: "warm" as Opportunity["heatStatus"],
+    productId: "",
+    isRecurring: false,
+    discountType: "none" as "none" | "percentage" | "fixed",
+    discountValue: 0,
   })
 
   const loadOpportunities = async () => {
@@ -64,8 +79,23 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
     setLoading(false)
   }
 
+  const loadProducts = async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    
+    const { data } = await supabase
+      .from("products")
+      .select("id, name, retail_price, billing_interval, classification")
+      .eq("user_id", user.id)
+      .order("name")
+    
+    if (data) setProducts(data)
+  }
+
   useEffect(() => {
     loadOpportunities()
+    loadProducts()
   }, [contact.id])
 
   const handleOpenNew = () => {
@@ -79,6 +109,10 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
       expectedCloseDate: "",
       notes: "",
       heatStatus: "warm",
+      productId: "",
+      isRecurring: false,
+      discountType: "none",
+      discountValue: 0,
     })
     setShowModal(true)
   }
@@ -94,6 +128,10 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
       expectedCloseDate: item.expectedCloseDate || "",
       notes: item.notes || "",
       heatStatus: item.heatStatus,
+      productId: "",
+      isRecurring: false,
+      discountType: "none",
+      discountValue: 0,
     })
     setShowModal(true)
   }
@@ -148,6 +186,29 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
 
   const totalValue = opportunities.reduce((sum, o) => sum + o.value, 0)
   const activeOpps = opportunities.filter(o => !o.stage.startsWith("closed_"))
+
+  const calculateFinalValue = () => {
+    let finalValue = formData.value
+    if (formData.discountType === "percentage") {
+      finalValue = formData.value * (1 - formData.discountValue / 100)
+    } else if (formData.discountType === "fixed") {
+      finalValue = Math.max(0, formData.value - formData.discountValue)
+    }
+    return finalValue
+  }
+
+  const handleProductSelect = (productId: string) => {
+    const product = products.find(p => p.id === productId)
+    if (product) {
+      setFormData({
+        ...formData,
+        productId,
+        value: product.retail_price,
+        isRecurring: product.billing_interval === "monthly" || product.billing_interval === "annual",
+        title: formData.title || product.name,
+      })
+    }
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -287,117 +348,258 @@ export function OpportunitiesSection({ contact }: OpportunitiesSectionProps) {
       )}
 
       {/* Add/Edit Modal */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Opportunity" : "New Opportunity"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g., SaaS Implementation"
-              />
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-6 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <Target size={28} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                    {editItem ? "EDIT OPPORTUNITY" : "NEW OPPORTUNITY"}
+                  </h2>
+                  <p className="text-xs font-bold text-indigo-600 tracking-wide">
+                    NODE: {contact.name?.toUpperCase()} @ {contact.company?.toUpperCase() || "UNKNOWN"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Opportunity Title */}
               <div className="space-y-2">
-                <Label>Value ($)</Label>
-                <Input
-                  type="number"
-                  value={formData.value}
-                  onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
-                  placeholder="15000"
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Opportunity Title
+                </label>
+                <input
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="e.g. Enterprise License Expansion"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
+              {/* Product Selection */}
               <div className="space-y-2">
-                <Label>Probability (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.probability}
-                  onChange={(e) => setFormData({ ...formData, probability: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Stage</Label>
-                <Select value={formData.stage} onValueChange={(v: any) => setFormData({ ...formData, stage: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Link to Product
+                </label>
+                <Select value={formData.productId} onValueChange={handleProductSelect}>
+                  <SelectTrigger className="w-full bg-slate-50 border-slate-200 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <Package size={14} className="text-slate-400" />
+                      <SelectValue placeholder="Select a product (optional)" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="discovery">Discovery</SelectItem>
-                    <SelectItem value="qualification">Qualification</SelectItem>
-                    <SelectItem value="proposal">Proposal</SelectItem>
-                    <SelectItem value="negotiation">Negotiation</SelectItem>
-                    <SelectItem value="closed_won">Closed Won</SelectItem>
-                    <SelectItem value="closed_lost">Closed Lost</SelectItem>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{product.name}</span>
+                          <span className="text-slate-400 ml-4">
+                            ${product.retail_price.toLocaleString()} / {product.billing_interval}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Deal Value & Expected Close */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Deal Value
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                    <input
+                      type="number"
+                      value={formData.value}
+                      onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Expected Close
+                  </label>
+                  <div className="relative">
+                    <Calendar size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={formData.expectedCloseDate}
+                      onChange={(e) => setFormData({ ...formData, expectedCloseDate: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Recurring Revenue Toggle */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">RECURRING REVENUE</h4>
+                  <p className="text-xs text-indigo-600 font-medium">MARK AS MONTHLY SUBSCRIPTION</p>
+                </div>
+                <Switch
+                  checked={formData.isRecurring}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked })}
+                />
+              </div>
+
+              {/* Discount Section */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Discount
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFormData({ ...formData, discountType: "none", discountValue: 0 })}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors ${
+                      formData.discountType === "none"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    None
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, discountType: "percentage" })}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors ${
+                      formData.discountType === "percentage"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    Percentage
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, discountType: "fixed" })}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors ${
+                      formData.discountType === "fixed"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    Fixed
+                  </button>
+                </div>
+                
+                {formData.discountType !== "none" && (
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                      {formData.discountType === "percentage" ? "%" : "$"}
+                    </span>
+                    <input
+                      type="number"
+                      value={formData.discountValue}
+                      onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+                      placeholder="0"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </div>
+                )}
+
+                {formData.discountType !== "none" && formData.discountValue > 0 && (
+                  <div className="flex items-center justify-between text-sm p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <span className="text-emerald-700 font-medium">Final Deal Value:</span>
+                    <span className="text-emerald-700 font-bold">${calculateFinalValue().toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Stage & Heat Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Stage
+                  </label>
+                  <Select value={formData.stage} onValueChange={(v: any) => setFormData({ ...formData, stage: v })}>
+                    <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="discovery">Discovery</SelectItem>
+                      <SelectItem value="qualification">Qualification</SelectItem>
+                      <SelectItem value="proposal">Proposal</SelectItem>
+                      <SelectItem value="negotiation">Negotiation</SelectItem>
+                      <SelectItem value="closed_won">Closed Won</SelectItem>
+                      <SelectItem value="closed_lost">Closed Lost</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Heat Status
+                  </label>
+                  <Select value={formData.heatStatus} onValueChange={(v: any) => setFormData({ ...formData, heatStatus: v })}>
+                    <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hot">Hot</SelectItem>
+                      <SelectItem value="warm">Warm</SelectItem>
+                      <SelectItem value="cold">Cold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Notes */}
               <div className="space-y-2">
-                <Label>Heat Status</Label>
-                <Select value={formData.heatStatus} onValueChange={(v: any) => setFormData({ ...formData, heatStatus: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hot">Hot</SelectItem>
-                    <SelectItem value="warm">Warm</SelectItem>
-                    <SelectItem value="cold">Cold</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Notes
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Internal notes..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 resize-none"
+                />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Expected Close Date</Label>
-              <Input
-                type="date"
-                value={formData.expectedCloseDate}
-                onChange={(e) => setFormData({ ...formData, expectedCloseDate: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description of the opportunity"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Internal notes..."
-                rows={2}
-              />
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors"
+              >
+                Discard
+              </button>
+              <Button
+                onClick={handleSave}
+                disabled={saving || !formData.title}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-8 py-3 font-bold"
+              >
+                {saving ? (
+                  <Loader2 size={16} className="animate-spin mr-2" />
+                ) : (
+                  <Check size={16} className="mr-2" />
+                )}
+                {editItem ? "Update Opportunity" : "Create Opportunity"}
+              </Button>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowModal(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !formData.title}>
-              {saving ? "Saving..." : editItem ? "Update" : "Create"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {isSchedulerOpen && (
         <MeetingScheduler 

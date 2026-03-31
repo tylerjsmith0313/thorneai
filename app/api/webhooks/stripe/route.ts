@@ -105,15 +105,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   let actualUserId = userId
   
   if (!actualUserId || actualUserId === "pending") {
-    // Try to find the user by email
-    const { data: userData } = await supabase
-      .from("auth.users")
-      .select("id")
-      .eq("email", email)
-      .single()
+    // Try to find the user by email using Supabase Admin Auth API
+    const { data: userData } = await supabase.auth.admin.listUsers()
+    const matchedUser = userData?.users?.find(u => u.email === email)
     
-    if (userData) {
-      actualUserId = userData.id
+    if (matchedUser) {
+      actualUserId = matchedUser.id
     }
   }
 

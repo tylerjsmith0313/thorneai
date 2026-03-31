@@ -116,7 +116,14 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResult> {
     
     // Log the communication if contactId provided
     if (params.contactId) {
-      await logEmailCommunication(params.contactId, params.subject, params.text, data.id)
+      await logEmailCommunication(
+        params.contactId, 
+        params.subject, 
+        params.text, 
+        params.to,
+        config.fromEmail,
+        data.id
+      )
     }
     
     return { success: true, messageId: data.id }
@@ -127,12 +134,14 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResult> {
 }
 
 /**
- * Log email communication to database
+ * Log email communication to database - stores in both contact_communications AND email_messages
  */
 async function logEmailCommunication(
   contactId: string, 
   subject: string, 
   content: string, 
+  toEmail: string,
+  fromEmail: string,
   mailgunId?: string
 ): Promise<void> {
   const supabase = await createClient()
@@ -140,6 +149,14 @@ async function logEmailCommunication(
   
   if (!user) return
 
+  // Get tenant_id for this contact
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("tenant_id")
+    .eq("id", contactId)
+    .single()
+
+  // Log to contact_communications (legacy table)
   await supabase.from("contact_communications").insert({
     contact_id: contactId,
     user_id: user.id,
@@ -149,6 +166,20 @@ async function logEmailCommunication(
     content: content,
     status: "sent",
     metadata: mailgunId ? { mailgun_id: mailgunId } : {}
+  })
+
+  // Also log to email_messages table (with full from/to email addresses)
+  await supabase.from("email_messages").insert({
+    message_id: mailgunId,
+    contact_id: contactId,
+    tenant_id: contact?.tenant_id || null,
+    direction: "outbound",
+    from_email: fromEmail,
+    to_email: toEmail,
+    subject: subject,
+    body_plain: content,
+    status: "sent",
+    received_at: new Date().toISOString(),
   })
   
   // Update contact's last_contact_date
@@ -317,9 +348,16 @@ export async function replyToEmail(params: {
 
     const data = await response.json()
     
-    if (params.contactId) {
-      await logEmailCommunication(params.contactId, params.subject, params.text, data.id)
-    }
+  if (params.contactId) {
+    await logEmailCommunication(
+      params.contactId, 
+      params.subject, 
+      params.text, 
+      params.to,
+      config.fromEmail,
+      data.id
+    )
+  }
     
     return { success: true, messageId: data.id }
   } catch (error) {

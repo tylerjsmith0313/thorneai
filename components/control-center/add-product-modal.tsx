@@ -16,16 +16,13 @@ import {
   HelpCircle,
   Users,
   Info,
+  Check,
+  FileText,
+  Loader2,
 } from "lucide-react"
 import { BaseButton } from "@/components/ui/base-button"
 import { BaseInput } from "@/components/ui/base-input"
-import { BaseTextArea } from "@/components/ui/base-textarea"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { createClient } from "@/lib/supabase/client"
 
 interface AdjustmentNode {
   id: string
@@ -42,17 +39,24 @@ interface IntelNode {
   content: string
 }
 
-interface AddProductModalProps {
-  onClose: () => void
-  onSave: (product: {
-    name: string
-    price: string
-    billingCycle: string
-    type: string
-  }) => void
+interface Product {
+  id: string
+  name: string
+  retail_price: number
+  billing_interval: string
+  classification: string
+  pitch_context?: string
+  is_deployed?: boolean
 }
 
-export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
+interface AddProductModalProps {
+  userId: string
+  onClose: () => void
+  onProductAdded: (product: Product) => void
+}
+
+export function AddProductModal({ userId, onClose, onProductAdded }: AddProductModalProps) {
+  const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showComplexBreakdown, setShowComplexBreakdown] = useState(false)
   const [formData, setFormData] = useState({
@@ -118,9 +122,39 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
     })
   }
 
-  const handleSave = () => {
-    onSave(formData)
-    onClose()
+  const handleSave = async () => {
+    if (!userId || !formData.name.trim()) return
+    
+    setIsSaving(true)
+    
+    const supabase = createClient()
+    
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        user_id: userId,
+        name: formData.name.trim(),
+        pitch_context: formData.description.trim() || null,
+        classification: formData.type.toLowerCase(),
+        retail_price: parseFloat(formData.price) || 0,
+        billing_interval: formData.billingCycle.toLowerCase().replace("-", "_"),
+        is_deployed: false,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error("[v0] Error creating product:", error)
+      setIsSaving(false)
+      return
+    }
+    
+    if (data) {
+      onProductAdded(data)
+      onClose()
+    }
+    
+    setIsSaving(false)
   }
 
   const calculations = () => {
@@ -201,15 +235,16 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   placeholder="e.g. Consulting Mastermind 2024"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 ml-1">Pitch Context</label>
-                <BaseTextArea
+                <textarea
                   placeholder="Define core value proposition for Thorne AI..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="min-h-[80px]"
+                  className="w-full px-4 py-3 bg-slate-900 rounded-2xl text-sm font-medium text-white placeholder:text-slate-500 outline-none transition-all focus:ring-2 focus:ring-indigo-500/30 min-h-[80px] resize-none"
                 />
               </div>
             </div>
@@ -218,16 +253,11 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
           <div className="space-y-4 pt-6 border-t border-slate-100">
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Classification</h3>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info size={14} className="text-slate-300 hover:text-indigo-500 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Consulting/Training models leverage volume-based math for scaling projections.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Info 
+                size={14} 
+                className="text-slate-300 hover:text-indigo-500 cursor-help" 
+                title="Consulting/Training models leverage volume-based math for scaling projections."
+              />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {productTypes.map((t) => (
@@ -327,6 +357,10 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   </div>
                 </div>
 
+                <p className="text-[9px] text-slate-400 font-medium leading-relaxed italic pt-2 relative z-10">
+                  {'"'}Optimized for {formData.type} delivery. Volume adjusted to {formData.volume} nodes.{'"'}
+                </p>
+
                 <Activity
                   size={100}
                   className="absolute right-[-20px] bottom-[-20px] text-indigo-500/10 pointer-events-none"
@@ -343,6 +377,7 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   icon={<DollarSign size={14} />}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
@@ -353,6 +388,7 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
                   value={formData.volume}
                   onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
                   icon={<Users size={14} />}
+                  variant="dark"
                 />
               </div>
               <div className="space-y-1">
@@ -475,41 +511,81 @@ export function AddProductModal({ onClose, onSave }: AddProductModalProps) {
               </div>
             </div>
 
-            {formData.intelNodes.length === 0 && (
-              <div className="py-8 text-center text-slate-300">
-                <p className="text-[10px] font-bold uppercase tracking-widest">No intelligence sources added</p>
-              </div>
-            )}
-
-            {formData.intelNodes.map((node) => (
-              <div
-                key={node.id}
-                className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  {node.type === "Link" && <LinkIcon size={14} className="text-indigo-500" />}
-                  {node.type === "File" && <Upload size={14} className="text-emerald-500" />}
-                  {node.type === "Text" && <AlignLeft size={14} className="text-amber-500" />}
-                  <span className="text-xs font-medium text-slate-700">{node.label}</span>
-                </div>
-                <button
-                  onClick={() => removeIntelNode(node.id)}
-                  className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+            <div className="space-y-2">
+              {formData.intelNodes.map((node) => (
+                <div
+                  key={node.id}
+                  className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group shadow-sm hover:bg-white transition-all"
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="text-slate-400">
+                      {node.type === "Link" ? (
+                        <LinkIcon size={14} />
+                      ) : node.type === "File" ? (
+                        <FileText size={14} />
+                      ) : (
+                        <AlignLeft size={14} />
+                      )}
+                    </div>
+                    <input
+                      className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-none flex-1"
+                      value={node.label}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          intelNodes: formData.intelNodes.map((n) =>
+                            n.id === node.id ? { ...n, label: e.target.value } : n
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                  <button
+                    onClick={() => removeIntelNode(node.id)}
+                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              {formData.intelNodes.length === 0 && (
+                <p className="text-[10px] text-slate-400 italic text-center py-4 opacity-50 font-medium tracking-wide">
+                  No intelligence nodes attached.
+                </p>
+              )}
+            </div>
+
+            
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-100 flex items-center justify-end gap-3 bg-white shrink-0">
-          <BaseButton variant="outline" onClick={onClose}>
-            Cancel
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <BaseButton
+            variant="ghost"
+            onClick={onClose}
+            className="text-[10px] uppercase font-bold text-slate-400 tracking-widest"
+          >
+            Discard Node
           </BaseButton>
-          <BaseButton variant="primary" onClick={handleSave}>
-            Save Product
-          </BaseButton>
+          <div className="flex gap-2">
+            <BaseButton
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-slate-200 font-bold uppercase tracking-widest text-[10px]"
+            >
+              Save Draft
+            </BaseButton>
+            <BaseButton
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || !formData.name.trim()}
+              className="rounded-xl px-10 shadow-lg shadow-indigo-100 font-bold uppercase tracking-widest text-[10px]"
+              icon={isSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+            >
+              {isSaving ? "Deploying..." : "Deploy Offer"}
+            </BaseButton>
+          </div>
         </div>
       </div>
     </div>

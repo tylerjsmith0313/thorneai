@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { 
   Send, Zap, User, Sparkles, Settings, 
   Paperclip, FileText, Calendar, Gift,
-  Loader2, Activity, X, Phone, AlertCircle, CheckCircle
+  Loader2, Activity, X, Phone, AlertCircle, CheckCircle,
+  Mail, ArrowDownLeft, ArrowUpRight
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendEmail, sendTemplatedEmail, isEmailConfigured } from "@/lib/services/email-service"
 import { toast } from "sonner"
 import type { Contact } from "@/types"
 
@@ -19,9 +19,12 @@ interface ConversationEngineModalProps {
 
 interface Message {
   id: string
-  type: "ai" | "user" | "system" | "transcription"
+  type: "ai" | "user" | "system" | "transcription" | "email-inbound" | "email-outbound"
   content: string
   timestamp: string
+  subject?: string
+  fromEmail?: string
+  toEmail?: string
 }
 
 export function ConversationEngineModal({ contact, onClose }: ConversationEngineModalProps) {
@@ -36,12 +39,13 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
   
   const supabase = createClient()
 
-  // Check if email is configured
+  // Check if email is configured (via environment variables on server)
   useEffect(() => {
-    isEmailConfigured().then(setEmailConfigured)
+    // Email is available if MAILGUN env vars are set - we check this server-side
+    setEmailConfigured(true) // Assume configured, API will return error if not
   }, [])
 
-  // Load email conversations for this contact only
+  // Load email conversations for this contact - pulls both from contact_communications AND email_messages
   useEffect(() => {
     async function loadEmailConversations() {
       setIsLoading(true)
@@ -54,14 +58,68 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
         .eq("channel", "email")
         .order("created_at", { ascending: true })
 
+      // Also fetch from email_messages table (stores actual emails with from/to)
+      const { data: emailMessages } = await supabase
+        .from("email_messages")
+        .select("*")
+        .eq("contact_id", contact.id)
+        .order("received_at", { ascending: true })
+
+      const allMessages: Message[] = []
+
+      // Process communications (legacy/simple messages)
       if (communications && communications.length > 0) {
-        const loadedMessages: Message[] = communications.map(comm => ({
-          id: comm.id,
-          type: comm.direction === "inbound" ? "user" : "ai",
-          content: comm.content,
-          timestamp: formatTimestamp(comm.created_at)
-        }))
-        setMessages(loadedMessages)
+        communications.forEach(comm => {
+          allMessages.push({
+            id: comm.id,
+            type: comm.direction === "inbound" ? "email-inbound" : "email-outbound",
+            content: comm.content,
+            timestamp: formatTimestamp(comm.created_at),
+            subject: comm.subject,
+            fromEmail: comm.direction === "inbound" ? contact.email : undefined,
+            toEmail: comm.direction === "outbound" ? contact.email : undefined
+          })
+        })
+      }
+
+      // Process email_messages (full email records with from/to addresses)
+      if (emailMessages && emailMessages.length > 0) {
+        emailMessages.forEach(email => {
+          // Avoid duplicates - check if we already have this email based on mailgun_id or content
+          const isDuplicate = allMessages.some(m => 
+            m.content === email.body_plain || m.content === email.stripped_text
+          )
+          
+          if (!isDuplicate) {
+            allMessages.push({
+              id: email.id,
+              type: email.direction === "inbound" ? "email-inbound" : "email-outbound",
+              content: email.stripped_text || email.body_plain || email.body_html || "",
+              timestamp: formatTimestamp(email.received_at || email.created_at),
+              subject: email.subject,
+              fromEmail: email.from_email,
+              toEmail: email.to_email
+            })
+          }
+        })
+      }
+
+      // Sort all messages by timestamp
+      allMessages.sort((a, b) => {
+        // Parse relative timestamps back to comparable values
+        const getTimeValue = (ts: string) => {
+          if (ts === "Just now") return Date.now()
+          const match = ts.match(/(\d+)(m|h|d)/)
+          if (!match) return 0
+          const [, num, unit] = match
+          const multipliers: Record<string, number> = { m: 60000, h: 3600000, d: 86400000 }
+          return Date.now() - (parseInt(num) * multipliers[unit])
+        }
+        return getTimeValue(a.timestamp) - getTimeValue(b.timestamp)
+      })
+
+      if (allMessages.length > 0) {
+        setMessages(allMessages)
       } else {
         // Default welcome message
         setMessages([{
@@ -119,29 +177,42 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
     setIsSending(true)
 
     try {
-      const result = await sendEmail({
-        to: contact.email,
-        subject: subject,
-        text: message,
-        contactId: contact.id,
-        trackOpens: true,
-        trackClicks: true,
-        tags: ["conversation-engine", "manual"]
+      const response = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: contact.email,
+          subject: subject,
+          text: message,
+          contactId: contact.id,
+        }),
       })
       
-      if (result.success) {
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
         toast.success("Email sent successfully!")
         setMessages(prev => [...prev, {
           id: `msg-${Date.now()}`,
-          type: "ai",
+          type: "email-outbound",
           content: message,
-          timestamp: "Just now"
+          timestamp: "Just now",
+          subject: subject,
+          toEmail: contact.email
         }])
         setMessage("")
         setSubject(`Follow up from AgyntSynq`)
       } else {
-        toast.error(result.error || "Failed to send email")
-        console.error("[v0] Failed to send email:", result.error)
+        // Enhanced error display for debugging
+        const errorDetails = result.debug ? `\n\nDebug: ${result.debug.errorMessage}` : ""
+        toast.error(`${result.error || "Failed to send email"}${result.domain ? ` (Domain: ${result.domain})` : ""}`)
+        console.error("[v0] Failed to send email:", {
+          error: result.error,
+          status: result.status,
+          domain: result.domain,
+          region: result.region,
+          debug: result.debug
+        })
       }
     } catch (error) {
       console.error("[v0] Failed to send message:", error)
@@ -268,7 +339,7 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
                 </div>
               ) : (
                 messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.type === "user" || msg.type === "transcription" ? "justify-end" : "justify-start"}`}>
+                  <div key={msg.id} className={`flex ${msg.type === "user" || msg.type === "transcription" || msg.type === "email-inbound" ? "justify-end" : "justify-start"}`}>
                     {msg.type === "system" ? (
                       <div className="flex items-start gap-2 max-w-sm">
                         <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
@@ -289,6 +360,50 @@ export function ConversationEngineModal({ contact, onClose }: ConversationEngine
                           {msg.content}
                         </div>
                         <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
+                      </div>
+                    ) : msg.type === "email-inbound" ? (
+                      // Inbound email from contact - displayed on right side (like a received message)
+                      <div className="max-w-md">
+                        <div className="flex items-center gap-1.5 mb-1 justify-end">
+                          <ArrowDownLeft size={10} className="text-emerald-500" />
+                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                            <Mail size={10} />
+                            From: {msg.fromEmail || contact.email}
+                          </p>
+                        </div>
+                        {msg.subject && (
+                          <p className="text-[9px] font-medium text-slate-500 mb-1 text-right truncate">
+                            Re: {msg.subject}
+                          </p>
+                        )}
+                        <div className="bg-emerald-50 border border-emerald-200 text-slate-700 rounded-2xl rounded-br-sm px-3 py-2 text-xs">
+                          {msg.content}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
+                      </div>
+                    ) : msg.type === "email-outbound" ? (
+                      // Outbound email to contact - displayed on left side (like a sent message)
+                      <div className="flex items-start gap-2 max-w-md">
+                        <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+                          <Mail className="text-indigo-600" size={12} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <ArrowUpRight size={10} className="text-indigo-500" />
+                            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">
+                              To: {msg.toEmail || contact.email}
+                            </p>
+                          </div>
+                          {msg.subject && (
+                            <p className="text-[9px] font-medium text-slate-500 mb-1 truncate max-w-[300px]">
+                              Subject: {msg.subject}
+                            </p>
+                          )}
+                          <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-slate-700">
+                            {msg.content}
+                          </div>
+                          <p className="text-[9px] text-rose-500 font-bold mt-1">{msg.timestamp}</p>
+                        </div>
                       </div>
                     ) : msg.type === "ai" ? (
                       <div className="flex items-start gap-2 max-w-sm">
