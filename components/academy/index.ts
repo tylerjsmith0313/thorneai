@@ -1,0 +1,5 @@
+export { AcademyModal } from "./academy-modal"
+export { AcademyHome } from "./academy-home"
+export { AcademyResources } from "./academy-resources"
+export { AcademyCourseOutline } from "./academy-course-outline"
+export { AcademyCatalogue } from "./academy-catalogue"

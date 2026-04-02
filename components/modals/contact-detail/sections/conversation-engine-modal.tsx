@@ -1,0 +1,563 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { 
+  Send, Zap, User, Sparkles, Settings, 
+  Paperclip, FileText, Calendar, Gift,
+  Loader2, Activity, X, Phone, AlertCircle, CheckCircle,
+  Mail, ArrowDownLeft, ArrowUpRight
+} from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import type { Contact } from "@/types"
+
+
+interface ConversationEngineModalProps {
+  contact: Contact
+  onClose: () => void
+}
+
+interface Message {
+  id: string
+  type: "ai" | "user" | "system" | "transcription" | "email-inbound" | "email-outbound"
+  content: string
+  timestamp: string
+  subject?: string
+  fromEmail?: string
+  toEmail?: string
+}
+
+export function ConversationEngineModal({ contact, onClose }: ConversationEngineModalProps) {
+  const [mode, setMode] = useState<"user" | "flow">("flow")
+  const [message, setMessage] = useState("")
+  const [subject, setSubject] = useState(`Follow up from AgyntSynq`)
+  const [isSending, setIsSending] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [aiInsight, setAiInsight] = useState<string | null>(null)
+  const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null)
+  
+  const supabase = createClient()
+
+  // Check if email is configured (via environment variables on server)
+  useEffect(() => {
+    // Email is available if MAILGUN env vars are set - we check this server-side
+    setEmailConfigured(true) // Assume configured, API will return error if not
+  }, [])
+
+  // Load email conversations for this contact - pulls both from contact_communications AND email_messages
+  useEffect(() => {
+    async function loadEmailConversations() {
+      setIsLoading(true)
+      
+      // Get email conversations from contact_communications table
+      const { data: communications } = await supabase
+        .from("contact_communications")
+        .select("*")
+        .eq("contact_id", contact.id)
+        .eq("channel", "email")
+        .order("created_at", { ascending: true })
+
+      // Also fetch from email_messages table (stores actual emails with from/to)
+      const { data: emailMessages } = await supabase
+        .from("email_messages")
+        .select("*")
+        .eq("contact_id", contact.id)
+        .order("received_at", { ascending: true })
+
+      const allMessages: Message[] = []
+
+      // Process communications (legacy/simple messages)
+      if (communications && communications.length > 0) {
+        communications.forEach(comm => {
+          allMessages.push({
+            id: comm.id,
+            type: comm.direction === "inbound" ? "email-inbound" : "email-outbound",
+            content: comm.content,
+            timestamp: formatTimestamp(comm.created_at),
+            subject: comm.subject,
+            fromEmail: comm.direction === "inbound" ? contact.email : undefined,
+            toEmail: comm.direction === "outbound" ? contact.email : undefined
+          })
+        })
+      }
+
+      // Process email_messages (full email records with from/to addresses)
+      if (emailMessages && emailMessages.length > 0) {
+        emailMessages.forEach(email => {
+          // Avoid duplicates - check if we already have this email based on mailgun_id or content
+          const isDuplicate = allMessages.some(m => 
+            m.content === email.body_plain || m.content === email.stripped_text
+          )
+          
+          if (!isDuplicate) {
+            allMessages.push({
+              id: email.id,
+              type: email.direction === "inbound" ? "email-inbound" : "email-outbound",
+              content: email.stripped_text || email.body_plain || email.body_html || "",
+              timestamp: formatTimestamp(email.received_at || email.created_at),
+              subject: email.subject,
+              fromEmail: email.from_email,
+              toEmail: email.to_email
+            })
+          }
+        })
+      }
+
+      // Sort all messages by timestamp
+      allMessages.sort((a, b) => {
+        // Parse relative timestamps back to comparable values
+        const getTimeValue = (ts: string) => {
+          if (ts === "Just now") return Date.now()
+          const match = ts.match(/(\d+)(m|h|d)/)
+          if (!match) return 0
+          const [, num, unit] = match
+          const multipliers: Record<string, number> = { m: 60000, h: 3600000, d: 86400000 }
+          return Date.now() - (parseInt(num) * multipliers[unit])
+        }
+        return getTimeValue(a.timestamp) - getTimeValue(b.timestamp)
+      })
+
+      if (allMessages.length > 0) {
+        setMessages(allMessages)
+      } else {
+        // Default welcome message
+        setMessages([{
+          id: "system-1",
+          type: "system",
+          content: `Connection established with ${contact.firstName} ${contact.lastName}. I am monitoring this node for engagement signals.`,
+          timestamp: "Just now"
+        }])
+      }
+
+      // Generate AI insight based on contact data
+      generateAiInsight()
+      setIsLoading(false)
+    }
+
+    loadEmailConversations()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact.id])
+
+  function formatTimestamp(dateString: string): string {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+    return `${Math.floor(diffMins / 1440)}d ago`
+  }
+
+  function generateAiInsight() {
+    const insights = [
+      `"AgyntSynq is currently drafting a reply that leverages the 'Q2 Onboarding' node. Recommended: Schedule call for tomorrow 2PM."`,
+      `"Based on ${contact.firstName}'s engagement pattern, optimal outreach window is Tuesday-Thursday, 10AM-2PM."`,
+      `"${contact.company} recently announced expansion. Consider positioning value prop around scalability."`,
+    ]
+    setAiInsight(insights[Math.floor(Math.random() * insights.length)])
+  }
+
+  const handleSend = async () => {
+    if (!message.trim() || isSending) return
+    
+    // Check if contact has email
+    if (!contact.email) {
+      toast.error("Contact has no email address")
+      return
+    }
+    
+    // Check if email is configured
+    if (!emailConfigured) {
+      toast.error("Email service not configured. Please set up Mailgun in Control Center > Integrations.")
+      return
+    }
+    
+    setIsSending(true)
+
+    try {
+      const response = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: contact.email,
+          subject: subject,
+          text: message,
+          contactId: contact.id,
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        toast.success("Email sent successfully!")
+        setMessages(prev => [...prev, {
+          id: `msg-${Date.now()}`,
+          type: "email-outbound",
+          content: message,
+          timestamp: "Just now",
+          subject: subject,
+          toEmail: contact.email
+        }])
+        setMessage("")
+        setSubject(`Follow up from AgyntSynq`)
+      } else {
+        // Enhanced error display for debugging
+        const errorDetails = result.debug ? `\n\nDebug: ${result.debug.errorMessage}` : ""
+        toast.error(`${result.error || "Failed to send email"}${result.domain ? ` (Domain: ${result.domain})` : ""}`)
+        console.error("[v0] Failed to send email:", {
+          error: result.error,
+          status: result.status,
+          domain: result.domain,
+          region: result.region,
+          debug: result.debug
+        })
+      }
+    } catch (error) {
+      console.error("[v0] Failed to send message:", error)
+      toast.error("Failed to send email. Please try again.")
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleAgyntDraft = async () => {
+    setIsSending(true)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    const drafts = [
+      `Hi ${contact.firstName}, I've been following ${contact.company}'s recent progress and I'm impressed by your growth trajectory. I wanted to share some insights that might be valuable...`,
+      `Hi ${contact.firstName}, since you've expressed interest in our platform recently, I wanted to reach out with a brief analysis on industry trends that I think you'll find interesting.`,
+      `Hi ${contact.firstName}, I noticed you were looking into our solutions and wanted to share some relevant case studies from similar companies in the ${contact.industry || "tech"} space.`
+    ]
+    
+    setMessage(drafts[Math.floor(Math.random() * drafts.length)])
+    setIsSending(false)
+  }
+
+  const handleTacticalAction = async (action: string) => {
+    setIsSending(true)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    let actionMessage = ""
+    switch (action) {
+      case "case-study":
+        actionMessage = `Hi ${contact.firstName}, I thought you might find this case study relevant to ${contact.company}'s current initiatives. It covers how similar organizations achieved 40% efficiency gains...`
+        break
+      case "discovery":
+        actionMessage = `Hi ${contact.firstName}, I'd love to schedule a quick discovery call to better understand ${contact.company}'s goals. Would you be available for a 30-minute chat this week?`
+        break
+      case "gift":
+        actionMessage = `Hi ${contact.firstName}, I wanted to send you a small token of appreciation for your time. Please check your email for a gift card...`
+        break
+    }
+    
+    setMessage(actionMessage)
+    setIsSending(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      
+      <div className="relative bg-white w-full max-w-5xl h-[85vh] rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+        {/* Modal Header */}
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-violet-600">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <Sparkles className="text-white" size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-white tracking-tight">AGYNTSYNQ CONVERSATION ENGINE</h2>
+              <p className="text-[10px] text-indigo-200">
+                Multi-channel engagement for {contact.firstName} {contact.lastName}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 bg-white/20 rounded-full text-white hover:bg-white/30 transition-all"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Panel - Chat */}
+          <div className="flex-1 flex flex-col border-r border-slate-100">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Sparkles className="text-indigo-600" size={20} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 tracking-tight">CONVERSATION ENGINE</h2>
+                  <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    Active Intelligence: {contact.firstName} {contact.lastName}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {/* Mode Toggle */}
+                <div className="flex items-center bg-slate-100 rounded-full p-0.5">
+                  <button
+                    onClick={() => setMode("user")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all ${
+                      mode === "user" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    <User size={12} />
+                    User
+                  </button>
+                  <button
+                    onClick={() => setMode("flow")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all ${
+                      mode === "flow" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    <Zap size={12} />
+                    Flow
+                  </button>
+                </div>
+                
+                <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
+                  <Settings size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="animate-spin text-indigo-500" size={24} />
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.type === "user" || msg.type === "transcription" || msg.type === "email-inbound" ? "justify-end" : "justify-start"}`}>
+                    {msg.type === "system" ? (
+                      <div className="flex items-start gap-2 max-w-sm">
+                        <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                          <Activity className="text-emerald-600" size={12} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-600">{msg.content}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">System</p>
+                        </div>
+                      </div>
+                    ) : msg.type === "transcription" ? (
+                      <div className="max-w-xs">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 justify-end">
+                          <Phone size={10} />
+                          Phone Transcription
+                        </p>
+                        <div className="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-3 py-2 text-xs">
+                          {msg.content}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
+                      </div>
+                    ) : msg.type === "email-inbound" ? (
+                      // Inbound email from contact - displayed on right side (like a received message)
+                      <div className="max-w-md">
+                        <div className="flex items-center gap-1.5 mb-1 justify-end">
+                          <ArrowDownLeft size={10} className="text-emerald-500" />
+                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                            <Mail size={10} />
+                            From: {msg.fromEmail || contact.email}
+                          </p>
+                        </div>
+                        {msg.subject && (
+                          <p className="text-[9px] font-medium text-slate-500 mb-1 text-right truncate">
+                            Re: {msg.subject}
+                          </p>
+                        )}
+                        <div className="bg-emerald-50 border border-emerald-200 text-slate-700 rounded-2xl rounded-br-sm px-3 py-2 text-xs">
+                          {msg.content}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
+                      </div>
+                    ) : msg.type === "email-outbound" ? (
+                      // Outbound email to contact - displayed on left side (like a sent message)
+                      <div className="flex items-start gap-2 max-w-md">
+                        <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+                          <Mail className="text-indigo-600" size={12} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <ArrowUpRight size={10} className="text-indigo-500" />
+                            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">
+                              To: {msg.toEmail || contact.email}
+                            </p>
+                          </div>
+                          {msg.subject && (
+                            <p className="text-[9px] font-medium text-slate-500 mb-1 truncate max-w-[300px]">
+                              Subject: {msg.subject}
+                            </p>
+                          )}
+                          <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-slate-700">
+                            {msg.content}
+                          </div>
+                          <p className="text-[9px] text-rose-500 font-bold mt-1">{msg.timestamp}</p>
+                        </div>
+                      </div>
+                    ) : msg.type === "ai" ? (
+                      <div className="flex items-start gap-2 max-w-sm">
+                        <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+                          <Activity className="text-indigo-600" size={12} />
+                        </div>
+                        <div>
+                          <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-slate-700">
+                            {msg.content}
+                          </div>
+                          <p className="text-[9px] text-rose-500 font-bold mt-1">{msg.timestamp}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="max-w-xs">
+                        <div className="bg-indigo-600 text-white rounded-2xl rounded-br-sm px-3 py-2 text-xs">
+                          {msg.content}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 text-right">{msg.timestamp}</p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+{/* Input */}
+  <div className="p-4 border-t border-slate-100 bg-white space-y-3">
+  {/* Email Config Warning */}
+  {emailConfigured === false && (
+    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+      <AlertCircle size={14} className="text-amber-600 shrink-0" />
+      <p className="text-[10px] text-amber-800">Email not configured. Set up Mailgun in Control Center to send emails.</p>
+    </div>
+  )}
+  
+  {/* Subject Line */}
+  <div className="flex items-center gap-2">
+    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subject:</span>
+    <input
+      type="text"
+      value={subject}
+      onChange={(e) => setSubject(e.target.value)}
+      placeholder="Email subject..."
+      className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-300"
+      disabled={isSending}
+    />
+  </div>
+  
+  <div className="bg-slate-50 rounded-xl p-3">
+  <textarea
+  value={message}
+  onChange={(e) => setMessage(e.target.value)}
+  placeholder={`Reply to ${contact.firstName}...`}
+  className="w-full bg-transparent text-xs resize-none outline-none min-h-[50px]"
+  disabled={isSending}
+  />
+                <div className="flex items-center justify-between mt-2">
+                  <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
+                    <Paperclip size={14} />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleAgyntDraft}
+                      disabled={isSending}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-bold uppercase tracking-wider text-slate-600 hover:border-indigo-300 transition-all disabled:opacity-50"
+                    >
+                      <Zap size={12} className="text-indigo-500" />
+                      Agynt Draft
+                    </button>
+                    <button
+                      onClick={handleSend}
+                      disabled={!message.trim() || isSending}
+                      className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all disabled:opacity-50"
+                    >
+                      {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Intel & Context */}
+          <div className="w-72 flex flex-col gap-4 p-4 overflow-y-auto bg-slate-50/50">
+            {/* AgyntSynq Real-Time Intel */}
+            <div className="bg-white rounded-[24px] border border-slate-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="text-indigo-500" size={14} />
+                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-widest">AgyntSynq Real-Time Intel</h3>
+              </div>
+              
+              <div className="bg-slate-800 rounded-xl p-3">
+                <p className="text-[10px] text-slate-300 italic leading-relaxed">
+                  {aiInsight}
+                </p>
+              </div>
+            </div>
+
+            {/* Contact Profile Context */}
+            <div className="bg-white rounded-[24px] border border-slate-200 p-4">
+              <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Contact Profile Context</h3>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Industry</span>
+                  <span className="text-[10px] font-medium text-slate-900">{contact.industry || "SaaS Architecture"}</span>
+                </div>
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Interests</span>
+                  <span className="text-[10px] font-medium text-slate-900 text-right">{contact.interests?.join(", ") || "Golf, Tech Investing"}</span>
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Demeanor</span>
+                  <span className="text-[10px] font-medium text-slate-900">{contact.demeanor || "Analytical"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tactical Actions */}
+            <div className="bg-white rounded-[24px] border border-slate-200 p-4">
+              <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Tactical Actions</h3>
+              
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleTacticalAction("case-study")}
+                  disabled={isSending}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
+                >
+                  <FileText size={14} className="text-slate-400" />
+                  Send Case Study
+                </button>
+                <button
+                  onClick={() => handleTacticalAction("discovery")}
+                  disabled={isSending}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
+                >
+                  <Calendar size={14} className="text-slate-400" />
+                  Propose Discovery Call
+                </button>
+                <button
+                  onClick={() => handleTacticalAction("gift")}
+                  disabled={isSending}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50"
+                >
+                  <Gift size={14} className="text-slate-400" />
+                  Send Custom Gift
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
